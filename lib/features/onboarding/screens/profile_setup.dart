@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'dart:convert'; // 🌟 This gives you the jsonEncode superpower!
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
 
@@ -9,6 +9,8 @@ class ProfileSetupScreen extends StatefulWidget {
 
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   int currentStep = 0;
+  // 🌟 This is your master data object! Ready for your API.
+  Map<String, dynamic> userProfile = {};
   static const int totalSteps = 11;
 
   @override
@@ -88,40 +90,160 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                             _buildStepContent(),
                             const SizedBox(height: 32),
 
-                            // ─────────── Next Button ───────────
-                            SizedBox(
-                              width: double.infinity,
-                              height: 60,
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(28),
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Color(0xFF00C853),
-                                      Color(0xFF2979FF),
-                                    ],
+                            // ─────────── Dynamic Bottom Buttons ───────────
+                            if (currentStep == 10) ...[
+                              // 🌟 Step 11: Final Summary Screen (Stacked Buttons)
+                              SizedBox(
+                                width: double.infinity,
+                                height: 60,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(28),
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFF00C853), Color(0xFF2979FF)],
+                                    ),
+                                  ),
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      // 🚀 Your API call goes here later!
+                                      print("Sending to API: $userProfile");
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.transparent,
+                                      shadowColor: Colors.transparent,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(28),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Generate My Personalized Plan',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                child: ElevatedButton(
-                                  onPressed: _nextStep,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.transparent,
-                                    shadowColor: Colors.transparent,
+                              ),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 60,
+                                child: OutlinedButton(
+                                  onPressed: () {
+                                    // Send them back to step 1 to edit
+                                    setState(() => currentStep = 0);
+                                  },
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(color: Colors.grey.shade300, width: 1.5),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(28),
                                     ),
                                   ),
-                                  child: Text(
-                                    currentStep == 0 ? 'Start' : 'Next',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 20,
+                                  child: const Text(
+                                    'Edit Profile',
+                                    style: TextStyle(
+                                      color: Colors.black54,
+                                      fontSize: 16,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
+                            ] else if (currentStep == 4 || currentStep == 9) ...[
+                              // 🌟 Steps 5 & 10: Skip & Continue (Side-by-side Buttons)
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 60,
+                                      child: OutlinedButton(
+                                        onPressed: _nextStep,
+                                        style: OutlinedButton.styleFrom(
+                                          side: BorderSide(color: Colors.grey.shade300, width: 1.5),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(28),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Skip',
+                                          style: TextStyle(
+                                            color: Colors.black87,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 60,
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(28),
+                                          gradient: const LinearGradient(
+                                            colors: [Color(0xFF00C853), Color(0xFF2979FF)],
+                                          ),
+                                        ),
+                                        child: ElevatedButton(
+                                          onPressed: _nextStep,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.transparent,
+                                            shadowColor: Colors.transparent,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(28),
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'Continue',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            ] else ...[
+                              // 🌟 All other steps: Single Main Button
+                              SizedBox(
+                                width: double.infinity,
+                                height: 60,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(28),
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFF00C853), Color(0xFF2979FF)],
+                                    ),
+                                  ),
+                                  child: ElevatedButton(
+                                    onPressed: _nextStep,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.transparent,
+                                      shadowColor: Colors.transparent,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(28),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      currentStep == 0 ? 'Start' : 'Continue',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -139,25 +261,36 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   Widget _buildStepContent() {
     switch (currentStep) {
       case 0:
-        return _GoalStep(onSelected: (value) {});
+        return _GoalStep(onSelected: (val) => userProfile['goal'] = val);
       case 1:
         return _GenderStep(
-          onSelected: (value) {},
+          onSelected: (val) => userProfile['gender'] = val,
           onBack: () => setState(() => currentStep--),
         );
       case 2:
-        return _BodyStatsStep(onSaved: (stats) {});
-      case 3: // 🌟 Your new Goal step!
-        return _MainGoalStep(
-          onSaved: (selectedGoals) {
-            // later: save this list of 1 or 2 goals
-            print(selectedGoals);
-          },
-        );
+        return _BodyStatsStep(onSaved: (val) => userProfile.addAll(val));
+      case 3:
+        return _MainGoalStep(onSaved: (val) => userProfile['mainGoals'] = val);
+      case 4:
+        return _PrecisionStep(onSaved: (val) => userProfile.addAll(val));
+      case 5:
+        return _FitnessLevelStep(onSaved: (val) => userProfile['fitnessLevel'] = val);
+      case 6:
+        return _TrainingPreferenceStep(onSaved: (val) => userProfile.addAll(val));
+      case 7:
+        return _WorkoutTimeStep(onSaved: (val) => userProfile['workoutTime'] = val);
+      case 8:
+        return _DietPreferenceStep(onSaved: (val) => userProfile['diet'] = val);
+      case 9:
+        return _InjuryStep(onSaved: (val) => userProfile['injuries'] = val);
+      case 10: // 🌟 Your brand new Summary Step!
+        return _SummaryStep(data: userProfile);
       default:
         return const Text('Next steps coming...');
     }
   }
+
+
 
 
   void _nextStep() {
@@ -692,4 +825,942 @@ class _MainGoalStepState extends State<_MainGoalStep> {
     );
   }
 }
+
+class _PrecisionStep extends StatefulWidget {
+  final Function(Map<String, dynamic>) onSaved;
+
+  const _PrecisionStep({required this.onSaved});
+
+  @override
+  State<_PrecisionStep> createState() => _PrecisionStepState();
+}
+
+class _PrecisionStepState extends State<_PrecisionStep> {
+  String? selectedBodyType;
+
+  // 🌟 New state variables for the advanced section
+  bool showAdvancedNumbers = false;
+  double bodyFat = 20;
+  String? selectedMuscleMass;
+
+  final List<Map<String, dynamic>> bodyTypes = [
+    {'label': 'Lean / Athletic', 'icon': Icons.monitor_heart_outlined},
+    {'label': 'Average', 'icon': Icons.person_outline},
+    {'label': 'Soft', 'icon': Icons.account_circle_outlined},
+    {'label': 'Overfat', 'icon': Icons.group_outlined},
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const Text(
+          "Want us to be more precise?",
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+          ),
+          textAlign: TextAlign.center,
+        ),
+
+        const SizedBox(height: 8),
+
+        const Text(
+          'This helps us personalize better',
+          style: TextStyle(color: Colors.grey),
+          textAlign: TextAlign.center,
+        ),
+
+        const SizedBox(height: 32),
+
+        // ─────────── Body Type Cards ───────────
+        ...bodyTypes.map((type) {
+          final isSelected = selectedBodyType == type['label'];
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: GestureDetector(
+              onTap: () {
+                setState(() => selectedBodyType = type['label'] as String);
+                _saveData();
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFF2979FF).withOpacity(0.05) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: isSelected ? const Color(0xFF2979FF) : Colors.grey.shade300,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.white : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: isSelected ? Border.all(color: const Color(0xFF2979FF).withOpacity(0.3)) : null,
+                      ),
+                      child: Icon(
+                        type['icon'] as IconData,
+                        color: isSelected ? const Color(0xFF2979FF) : Colors.grey.shade700,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      type['label'] as String,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: isSelected ? const Color(0xFF2979FF) : Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+
+        const SizedBox(height: 8),
+
+        // ─────────── Advanced Toggle Button ───────────
+        SizedBox(
+          width: double.infinity,
+          height: 60,
+          child: OutlinedButton(
+            onPressed: () {
+              setState(() {
+                showAdvancedNumbers = !showAdvancedNumbers;
+              });
+            },
+            style: OutlinedButton.styleFrom(
+              // Note: Native Flutter doesn't have dashed borders built-in.
+              // We're using a solid light-grey border here to keep it clean!
+              side: BorderSide(color: Colors.grey.shade300, width: 1.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+            child: Text(
+              showAdvancedNumbers ? '- Hide' : '+ I know my numbers',
+              style: TextStyle(
+                color: showAdvancedNumbers ? Colors.grey.shade500 : Colors.black87,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+
+        // ─────────── Expanding Advanced Section ───────────
+        if (showAdvancedNumbers) ...[
+          const SizedBox(height: 32),
+
+          // Body Fat Slider
+          _buildCustomSlider(
+            label: 'Body Fat %',
+            value: bodyFat,
+            min: 5,
+            max: 50,
+            unit: ' %',
+            onChanged: (val) {
+              setState(() => bodyFat = val);
+              _saveData();
+            },
+          ),
+
+          const SizedBox(height: 24),
+
+          // Muscle Mass Row
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Muscle Mass',
+                style: TextStyle(fontSize: 16, color: Colors.black87),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: ['Low', 'Medium', 'High'].map((level) {
+                  final isSelected = selectedMuscleMass == level;
+                  return Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        // Add spacing between buttons perfectly
+                        right: level != 'High' ? 8.0 : 0,
+                        left: level != 'Low' ? 8.0 : 0,
+                      ),
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() => selectedMuscleMass = level);
+                          _saveData();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: isSelected ? const Color(0xFF22E1A0).withOpacity(0.05) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: isSelected ? const Color(0xFF22E1A0) : Colors.grey.shade300,
+                              width: 1.5,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            level,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                              color: isSelected ? const Color(0xFF00C853) : Colors.black87,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  // Sends the data back up whenever anything changes
+  void _saveData() {
+    widget.onSaved({
+      'bodyType': selectedBodyType,
+      'bodyFat': showAdvancedNumbers ? bodyFat : null,
+      'muscleMass': showAdvancedNumbers ? selectedMuscleMass : null,
+    });
+  }
+
+  // ─────────── Reusable Slider Builder ───────────
+  // (Copied here so this step widget has everything it needs!)
+  Widget _buildCustomSlider({
+    required String label,
+    required double value,
+    required double min,
+    required double max,
+    required String unit,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(fontSize: 16, color: Colors.black87),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF22E1A0), Color(0xFF1E88E5)],
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                '${value.toInt()}$unit',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            trackHeight: 8,
+            activeTrackColor: const Color(0xFF22E1A0),
+            inactiveTrackColor: Colors.grey.shade200,
+            thumbShape: const GradientThumbShape(thumbRadius: 14), // Uses your awesome custom thumb!
+            overlayShape: SliderComponentShape.noOverlay,
+            trackShape: const RoundedRectSliderTrackShape(),
+          ),
+          child: Slider(
+            value: value,
+            min: min,
+            max: max,
+            onChanged: onChanged,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('${min.toInt()}', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+              Text('${max.toInt()}', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FitnessLevelStep extends StatefulWidget {
+  final Function(String) onSaved;
+
+  const _FitnessLevelStep({required this.onSaved});
+
+  @override
+  State<_FitnessLevelStep> createState() => _FitnessLevelStepState();
+}
+
+class _FitnessLevelStepState extends State<_FitnessLevelStep> {
+  String? selectedLevel;
+
+  final List<Map<String, dynamic>> levels = [
+    {
+      'title': 'Beginner',
+      'subtitle': 'New to fitness',
+      'icon': Icons.show_chart,
+    },
+    {
+      'title': 'Intermediate',
+      'subtitle': 'Regular workouts',
+      'icon': Icons.trending_up,
+    },
+    {
+      'title': 'Advanced',
+      'subtitle': 'Experienced athlete',
+      'icon': Icons.bolt_outlined,
+    },
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const Text(
+          "How would you describe your fitness level?",
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+          ),
+          textAlign: TextAlign.center,
+        ),
+
+        const SizedBox(height: 32),
+
+        ...levels.map((level) {
+          final isSelected = selectedLevel == level['title'];
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: GestureDetector(
+              onTap: () {
+                setState(() => selectedLevel = level['title'] as String);
+                widget.onSaved(selectedLevel!);
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFF2979FF).withOpacity(0.05) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: isSelected ? const Color(0xFF2979FF) : Colors.grey.shade300,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.white : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: isSelected ? Border.all(color: const Color(0xFF2979FF).withOpacity(0.3)) : null,
+                      ),
+                      child: Icon(
+                        level['icon'] as IconData,
+                        color: isSelected ? const Color(0xFF2979FF) : Colors.grey.shade700,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          level['title'] as String,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                            color: isSelected ? const Color(0xFF2979FF) : Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          level['subtitle'] as String,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
+}
+
+
+class _TrainingPreferenceStep extends StatefulWidget {
+  final Function(Map<String, String>) onSaved;
+
+  const _TrainingPreferenceStep({required this.onSaved});
+
+  @override
+  State<_TrainingPreferenceStep> createState() => _TrainingPreferenceStepState();
+}
+
+class _TrainingPreferenceStepState extends State<_TrainingPreferenceStep> {
+  String? selectedDuration;
+  String? selectedIntensity;
+
+  final List<String> durations = ['30 minutes', '45 minutes', '60 minutes'];
+
+  final List<Map<String, dynamic>> intensities = [
+    {'label': 'Low intensity', 'icon': Icons.show_chart},
+    {'label': 'High intensity', 'icon': Icons.local_fire_department_outlined},
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start, // Aligns subheaders to the left
+      children: [
+        const Center(
+          child: Text(
+            "How do you prefer to train?",
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+
+        const SizedBox(height: 32),
+
+        // ─────────── Duration Section ───────────
+        const Text(
+          'Duration',
+          style: TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 12),
+        ...durations.map((duration) => _buildOptionCard(
+          label: duration,
+          icon: Icons.access_time,
+          isSelected: selectedDuration == duration,
+          onTap: () {
+            setState(() => selectedDuration = duration);
+            _saveData();
+          },
+        )).toList(),
+
+        const SizedBox(height: 16),
+
+        // ─────────── Intensity Section ───────────
+        const Text(
+          'Intensity',
+          style: TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 12),
+        ...intensities.map((intensity) => _buildOptionCard(
+          label: intensity['label'] as String,
+          icon: intensity['icon'] as IconData,
+          isSelected: selectedIntensity == intensity['label'],
+          onTap: () {
+            setState(() => selectedIntensity = intensity['label'] as String);
+            _saveData();
+          },
+        )).toList(),
+      ],
+    );
+  }
+
+  void _saveData() {
+    if (selectedDuration != null && selectedIntensity != null) {
+      widget.onSaved({
+        'duration': selectedDuration!,
+        'intensity': selectedIntensity!,
+      });
+    }
+  }
+
+  // Reusable card builder for this step to keep the code clean!
+  Widget _buildOptionCard({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF2979FF).withOpacity(0.05) : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF2979FF) : Colors.grey.shade300,
+              width: 1.5,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(10),
+                  border: isSelected ? Border.all(color: const Color(0xFF2979FF).withOpacity(0.3)) : null,
+                ),
+                child: Icon(
+                  icon,
+                  color: isSelected ? const Color(0xFF2979FF) : Colors.grey.shade700,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  color: isSelected ? const Color(0xFF2979FF) : Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkoutTimeStep extends StatefulWidget {
+  final Function(String) onSaved;
+
+  const _WorkoutTimeStep({required this.onSaved});
+
+  @override
+  State<_WorkoutTimeStep> createState() => _WorkoutTimeStepState();
+}
+
+class _WorkoutTimeStepState extends State<_WorkoutTimeStep> {
+  String? selectedTime;
+
+  final List<Map<String, dynamic>> times = [
+    {'label': 'Morning', 'icon': Icons.wb_twilight},
+    {'label': 'Afternoon', 'icon': Icons.light_mode_outlined},
+    {'label': 'Evening', 'icon': Icons.brightness_3_outlined},
+    {'label': 'Night', 'icon': Icons.dark_mode_outlined},
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const Text(
+          "When do you usually work out?",
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+          ),
+          textAlign: TextAlign.center,
+        ),
+
+        const SizedBox(height: 32),
+
+        ...times.map((time) {
+          final isSelected = selectedTime == time['label'];
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: GestureDetector(
+              onTap: () {
+                setState(() => selectedTime = time['label'] as String);
+                widget.onSaved(selectedTime!);
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                decoration: BoxDecoration(
+                  // Light teal background when selected
+                  color: isSelected ? const Color(0xFF22E1A0).withOpacity(0.08) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: isSelected ? const Color(0xFF22E1A0) : Colors.grey.shade300,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        // Blue gradient background for the selected icon
+                        gradient: isSelected
+                            ? const LinearGradient(colors: [Color(0xFF2979FF), Color(0xFF1E88E5)])
+                            : null,
+                        color: isSelected ? null : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        time['icon'] as IconData,
+                        color: isSelected ? Colors.white : Colors.grey.shade700,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      time['label'] as String,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: isSelected ? const Color(0xFF22E1A0) : Colors.black87,
+                      ),
+                    ),
+                    const Spacer(), // Pushes the checkmark to the far right
+                    if (isSelected)
+                      const Icon(
+                        Icons.check_circle,
+                        color: Color(0xFF22E1A0),
+                        size: 24,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
+}
+
+class _DietPreferenceStep extends StatefulWidget {
+  final Function(String) onSaved;
+
+  const _DietPreferenceStep({required this.onSaved});
+
+  @override
+  State<_DietPreferenceStep> createState() => _DietPreferenceStepState();
+}
+
+class _DietPreferenceStepState extends State<_DietPreferenceStep> {
+  String? selectedDiet;
+
+  final List<Map<String, dynamic>> diets = [
+    {'label': 'Omnivore', 'icon': Icons.restaurant},
+    {'label': 'Vegetarian', 'icon': Icons.soup_kitchen_outlined}, // Bowl icon
+    {'label': 'Vegan', 'icon': Icons.eco_outlined},
+    {'label': 'Mediterranean', 'icon': Icons.set_meal_outlined}, // Fish icon
+    {'label': 'Lactose-Free', 'icon': Icons.water_drop_outlined},
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const Text(
+          "How do you usually eat?",
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+          ),
+          textAlign: TextAlign.center,
+        ),
+
+        const SizedBox(height: 32),
+
+        ...diets.map((diet) {
+          final isSelected = selectedDiet == diet['label'];
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: GestureDetector(
+              onTap: () {
+                setState(() => selectedDiet = diet['label'] as String);
+                widget.onSaved(selectedDiet!);
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFF2979FF).withOpacity(0.05) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: isSelected ? const Color(0xFF2979FF) : Colors.grey.shade300,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.white : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: isSelected ? Border.all(color: const Color(0xFF2979FF).withOpacity(0.3)) : null,
+                      ),
+                      child: Icon(
+                        diet['icon'] as IconData,
+                        color: isSelected ? const Color(0xFF2979FF) : Colors.grey.shade700,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      diet['label'] as String,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: isSelected ? const Color(0xFF2979FF) : Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
+}
+class _InjuryStep extends StatefulWidget {
+  final Function(List<String>) onSaved;
+
+  const _InjuryStep({required this.onSaved});
+
+  @override
+  State<_InjuryStep> createState() => _InjuryStepState();
+}
+
+class _InjuryStepState extends State<_InjuryStep> {
+  // Using a Set to allow multiple selections easily!
+  Set<String> selectedAreas = {};
+
+  final List<String> areas = ['Knee', 'Shoulder', 'Lower Back'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const Text(
+          "Anything we should be careful with?",
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+          ),
+          textAlign: TextAlign.center,
+        ),
+
+        const SizedBox(height: 8),
+
+        const Text(
+          'Select any areas of concern',
+          style: TextStyle(color: Colors.grey),
+          textAlign: TextAlign.center,
+        ),
+
+        const SizedBox(height: 32),
+
+        ...areas.map((area) {
+          final isSelected = selectedAreas.contains(area);
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (isSelected) {
+                    selectedAreas.remove(area);
+                  } else {
+                    selectedAreas.add(area);
+                  }
+                });
+                widget.onSaved(selectedAreas.toList());
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFF2979FF).withOpacity(0.05) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: isSelected ? const Color(0xFF2979FF) : Colors.grey.shade300,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.white : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: isSelected ? Border.all(color: const Color(0xFF2979FF).withOpacity(0.3)) : null,
+                      ),
+                      child: Icon(
+                        Icons.error_outline, // The little exclamation mark icon
+                        color: isSelected ? const Color(0xFF2979FF) : Colors.grey.shade700,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      area,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: isSelected ? const Color(0xFF2979FF) : Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
+}
+
+class _SummaryStep extends StatelessWidget {
+  final Map<String, dynamic> data;
+
+  const _SummaryStep({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    // Safely extracting the data with fallbacks so the app never crashes!
+    final age = data['age']?.toInt() ?? 25;
+    final height = data['height']?.toInt() ?? 170;
+    final weight = data['weight']?.toInt() ?? 70;
+    final gender = (data['gender'] ?? 'Not specified').toString().toLowerCase();
+
+    // Formatting lists (like goals) into strings
+    final rawGoals = data['mainGoals'] as List<String>? ?? ['Health'];
+    final goalsStr = rawGoals.join(' & ').toLowerCase();
+    final level = (data['fitnessLevel'] ?? 'beginner').toString().toLowerCase();
+
+    final duration = data['duration'] ?? '60 minutes';
+    final intensity = (data['intensity'] ?? 'low intensity').toString().toLowerCase();
+    final time = (data['workoutTime'] ?? 'morning').toString().toLowerCase();
+
+    final diet = (data['diet'] ?? 'Not specified').toString().toLowerCase();
+
+    return Column(
+      children: [
+        // ─────────── Top Sparkle Icon ───────────
+        Container(
+          width: 60,
+          height: 60,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: [Color(0xFF22E1A0), Color(0xFF1E88E5)],
+            ),
+          ),
+          child: const Icon(Icons.auto_awesome, color: Colors.white, size: 32),
+        ),
+
+        const SizedBox(height: 16),
+
+        const Text(
+          "Here's your WellU profile",
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+          textAlign: TextAlign.center,
+        ),
+
+        const SizedBox(height: 8),
+
+        const Text(
+          'Review your personalized settings',
+          style: TextStyle(color: Colors.grey),
+          textAlign: TextAlign.center,
+        ),
+
+        const SizedBox(height: 32),
+
+        // ─────────── Summary Cards ───────────
+        _buildSummaryCard(
+          title: 'Body Basics',
+          content: '$age years • $height cm • $weight kg • $gender',
+        ),
+        _buildSummaryCard(
+          title: 'Fitness',
+          content: 'Goal: $goalsStr • Level: $level',
+        ),
+        _buildSummaryCard(
+          title: 'Workout Preferences',
+          content: '${duration.replaceAll(' minutes', ' min')} • $intensity • $time',
+        ),
+        _buildSummaryCard(
+          title: 'Nutrition',
+          content: diet,
+        ),
+      ],
+    );
+  }
+
+  // Helper widget to keep the card design consistent
+  Widget _buildSummaryCard({required String title, required String content}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50, // Very light grey background
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            content,
+            style: const TextStyle(fontSize: 16, color: Colors.black87),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
 
