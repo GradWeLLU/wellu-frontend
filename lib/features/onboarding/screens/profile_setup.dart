@@ -264,7 +264,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 140), // Replaced the giant 250 spacer
+              const SizedBox(height: 10), // Replaced the giant 250 spacer
             ],
           ),
         ),

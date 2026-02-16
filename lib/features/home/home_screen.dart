@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_gradients.dart';
+import '../../ai_chat/chat_screen.dart';
 
 import 'widgets/stat_card.dart';
 import 'widgets/ai_assistant_card.dart';
@@ -25,19 +26,11 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 20),
 
               /// 🔹 Greeting
-              const GreetingSection(name: "Alex"),
+              const GreetingSection(name: "tawfik"),
 
               const SizedBox(height: 30),
 
-              /// 🔹 Stats Section
-              const StatCard(
-                icon: Icons.directions_walk,
-                iconBgColor: AppColors.stepsGreen,
-                title: "Steps",
-                value: "6,842 / 10,000",
-                progress: 0.68,
-                progressColor: AppColors.stepsGreen,
-              ),
+
 
               const StatCard(
                 icon: Icons.local_fire_department,
@@ -62,6 +55,14 @@ class HomeScreen extends StatelessWidget {
               /// 🔹 AI Assistant Card
               AIAssistantCard(
                 onChatTap: () {
+                  {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ChatScreen(),
+                      ),
+                    );
+                  }
                   // TODO: Navigate to AI Chat Screen
                 },
               ),
