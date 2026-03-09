@@ -4,6 +4,8 @@ import '../../core/theme/app_gradients.dart';
 import '../workout/screens/workout_plan_screen.dart';
 import '../../ai_chat/chat_screen.dart';
 import '../../meals/meal_plan_screen.dart';
+// ADDED IMPORT HERE: Update the path if you placed the file in a different folder
+import '../posture/screens/check_posture_screen.dart';
 
 
 import 'widgets/stat_card.dart';
@@ -66,7 +68,6 @@ class HomeScreen extends StatelessWidget {
                       ),
                     );
                   }
-                  // TODO: Navigate to AI Chat Screen
                 },
               ),
 
@@ -112,7 +113,13 @@ class HomeScreen extends StatelessWidget {
                 buttonText: "Check Posture",
                 buttonGradient: AppGradients.posture,
                 onPressed: () {
-                  // TODO: Navigate to Posture Detection Screen
+                  // --- ADDED NAVIGATION HERE ---
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SelectExerciseScreen(),
+                    ),
+                  );
                 },
               ),
 

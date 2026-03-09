@@ -1,8 +1,67 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import '../../onboarding/screens/profile_setup.dart';
 
-class SignUpScreen extends StatelessWidget {
+class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
+
+  @override
+  State<SignUpScreen> createState() => _SignUpScreenState();
+}
+
+class _SignUpScreenState extends State<SignUpScreen> {
+  // Logic: Controllers to capture your input
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController confirmPasswordController = TextEditingController();
+
+  // Logic: Function to send data to Rola's backend
+  Future<void> sendRegistration() async {
+    final url = Uri.parse("http://10.0.2.2:8081/user/register");
+    try {
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+          body: jsonEncode({
+            "firstName": nameController.text.split(' ').first,
+            "lastName": nameController.text.contains(' ') ? nameController.text.split(' ').last : "User",
+            "email": emailController.text.trim(),
+            "password": passwordController.text,
+            "country": "Egypt",
+            "role": "User"
+          }),
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ProfileSetupScreen()),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: ${response.body}")),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Connection Failed. Check Docker.")),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    confirmPasswordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +74,7 @@ class SignUpScreen extends StatelessWidget {
             children: [
               const SizedBox(height: 20),
 
-              // ─────────── Top Card (Image Placeholder) ───────────
+              // Top Card Placeholder
               Container(
                 height: 180,
                 width: double.infinity,
@@ -33,75 +92,64 @@ class SignUpScreen extends StatelessWidget {
               ),
 
               const SizedBox(height: 32),
-
-              // ─────────── Title ───────────
               const Center(
                 child: Text(
                   'Create Your WellU Account',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w600),
                 ),
               ),
 
               const SizedBox(height: 12),
-
-              // ─────────── Subtitle ───────────
               const Center(
                 child: Text(
-                  'Sign up to personalize your workouts,\n'
-                      'nutrition, and wellness guidance',
+                  'Sign up to personalize your workouts,\nnutrition, and wellness guidance',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                  ),
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
                 ),
               ),
 
               const SizedBox(height: 32),
 
-              // ─────────── Full Name ───────────
               const _FieldLabel(text: 'Full Name'),
-              const _InputField(
+              _InputField(
                 hint: 'Enter your full name',
                 icon: Icons.person_outline,
+                controller: nameController,
               ),
 
               const SizedBox(height: 20),
 
-              // ─────────── Email ───────────
               const _FieldLabel(text: 'Email Address'),
-              const _InputField(
+              _InputField(
                 hint: 'your.email@example.com',
                 icon: Icons.mail_outline,
                 keyboardType: TextInputType.emailAddress,
+                controller: emailController,
               ),
 
               const SizedBox(height: 20),
 
-              // ─────────── Password ───────────
               const _FieldLabel(text: 'Password'),
-              const _InputField(
+              _InputField(
                 hint: 'Create a strong password',
                 icon: Icons.lock_outline,
                 obscureText: true,
+                controller: passwordController,
               ),
 
               const SizedBox(height: 20),
 
-              // ─────────── Confirm Password ───────────
               const _FieldLabel(text: 'Confirm Password'),
-              const _InputField(
+              _InputField(
                 hint: 'Re-enter your password',
                 icon: Icons.lock_outline,
                 obscureText: true,
+                controller: confirmPasswordController,
               ),
 
               const SizedBox(height: 30),
 
-              // ─────────── Sign Up Button ───────────
+              // Sign Up Button with Gradient and Logic
               SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -109,74 +157,39 @@ class SignUpScreen extends StatelessWidget {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(28),
                     gradient: const LinearGradient(
-                      colors: [
-                        Color(0xFF00C853),
-                        Color(0xFF2979FF),
-                      ],
+                      colors: [Color(0xFF00C853), Color(0xFF2979FF)],
                     ),
                   ),
                   child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ProfileSetupScreen(),
-                        ),
-                      );
-                    },
-
+                    onPressed: () => sendRegistration(),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
                       shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
                     ),
                     child: const Text(
                       'Sign Up',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ),
               ),
 
               const SizedBox(height: 24),
-
-              // ─────────── Divider OR ───────────
               Row(
                 children: const [
                   Expanded(child: Divider()),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 12),
-                    child: Text('or'),
-                  ),
+                  Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('or')),
                   Expanded(child: Divider()),
                 ],
               ),
 
               const SizedBox(height: 24),
-
-              // ─────────── Google Button ───────────
-              _SocialButton(
-                text: 'Continue with Google',
-                icon: Icons.g_mobiledata_rounded,
-              ),
-
+              _SocialButton(text: 'Continue with Google', icon: Icons.g_mobiledata_rounded),
               const SizedBox(height: 16),
-
-              // ─────────── Apple Button ───────────
-              _SocialButton(
-                text: 'Continue with Apple',
-                icon: Icons.apple,
-              ),
+              _SocialButton(text: 'Continue with Apple', icon: Icons.apple),
 
               const SizedBox(height: 32),
-
-              // ─────────── Bottom Text ───────────
               Center(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -186,16 +199,12 @@ class SignUpScreen extends StatelessWidget {
                       onTap: () {},
                       child: const Text(
                         'Log In',
-                        style: TextStyle(
-                          color: Color(0xFF2979FF),
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: TextStyle(color: Color(0xFF2979FF), fontWeight: FontWeight.w600),
                       ),
                     ),
                   ],
                 ),
               ),
-
               const SizedBox(height: 24),
             ],
           ),
@@ -204,47 +213,39 @@ class SignUpScreen extends StatelessWidget {
     );
   }
 }
-// -------------------------------------------------
-// PASTE THESE WIDGETS AT THE END OF YOUR FILE
-// -------------------------------------------------
 
-/// A private helper widget for displaying a field label.
+// ─────────── Helper Widgets ───────────
+
 class _FieldLabel extends StatelessWidget {
   const _FieldLabel({required this.text});
   final String text;
-
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0, left: 4.0),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 16,
-        ),
-      ),
+      child: Text(text, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
     );
   }
 }
 
-/// A private helper widget for a styled text input field.
 class _InputField extends StatelessWidget {
   const _InputField({
     required this.hint,
     required this.icon,
     this.obscureText = false,
     this.keyboardType = TextInputType.text,
+    this.controller,
   });
-
   final String hint;
   final IconData icon;
   final bool obscureText;
   final TextInputType keyboardType;
+  final TextEditingController? controller;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
+      controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
       decoration: InputDecoration(
@@ -253,45 +254,23 @@ class _InputField extends StatelessWidget {
         filled: true,
         fillColor: Colors.white,
         contentPadding: const EdgeInsets.symmetric(vertical: 18),
-
-        // Fallback border
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
-          borderSide: const BorderSide(
-            color: Color(0xFFE0E0E0),
-            width: 1.5,
-          ),
-        ),
-
-        // Border when NOT focused
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
-          borderSide: const BorderSide(
-            color: Color(0xFFE0E0E0), // light grey
-            width: 1.5,
-          ),
+          borderSide: const BorderSide(color: Color(0xFFE0E0E0), width: 1.5),
         ),
-
-        // Border when focused
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
-          borderSide: const BorderSide(
-            color: Color(0xFF2979FF), // your blue brand color
-            width: 2,
-          ),
+          borderSide: const BorderSide(color: Color(0xFF2979FF), width: 2),
         ),
       ),
-
     );
   }
 }
 
-/// A private helper widget for social login buttons.
 class _SocialButton extends StatelessWidget {
   const _SocialButton({required this.text, required this.icon});
   final String text;
   final IconData icon;
-
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -300,18 +279,9 @@ class _SocialButton extends StatelessWidget {
       child: OutlinedButton.icon(
         onPressed: () {},
         icon: Icon(icon, color: Colors.black87),
-        label: Text(
-          text,
-          style: const TextStyle(
-            color: Colors.black87,
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
-        ),
+        label: Text(text, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 16)),
         style: OutlinedButton.styleFrom(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           side: BorderSide(color: Colors.grey.shade300),
         ),
       ),
