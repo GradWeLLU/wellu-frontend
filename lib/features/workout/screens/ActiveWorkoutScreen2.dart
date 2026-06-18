@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../models/workout_plan_model.dart';
+import '../models/workout_plan_model2.dart'; // Make sure this points to your new models!
 
 class ActiveWorkoutScreen extends StatefulWidget {
-  final WorkoutPlan plan;
-
-  const ActiveWorkoutScreen({super.key, required this.plan});
+  // 👇 Updated to use WorkoutResponse
+  final WorkoutResponse plan;
+  final int dayIndex; // 👈 Add this!
+  const ActiveWorkoutScreen({super.key, required this.plan,required this.dayIndex});
 
   @override
   State<ActiveWorkoutScreen> createState() => _ActiveWorkoutScreenState();
@@ -39,11 +40,14 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 
   void _flattenExercises() {
-    _allExercises = [
-      ...widget.plan.warmup.map((e) => ExerciseWithCategory(e, "Warmup")),
-      ...widget.plan.main.map((e) => ExerciseWithCategory(e, "Main")),
-      ...widget.plan.cooldown.map((e) => ExerciseWithCategory(e, "Cooldown")),
-    ];
+    _allExercises = [];
+
+    // 👇 Now it ONLY looks at the specific day you pass to it!
+    var selectedDayPlan = widget.plan.days[widget.dayIndex];
+
+    for (var exercise in selectedDayPlan.exercises) {
+      _allExercises.add(ExerciseWithCategory(exercise, selectedDayPlan.day));
+    }
   }
 
   void _startSessionTimer() {
@@ -62,11 +66,10 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     });
   }
 
-  // Jump to a specific exercise when clicked from the list
   void _jumpToExercise(int index) {
     setState(() {
       _currentIndex = index;
-      _currentSetProgress = 0; // Reset local set counter for the new exercise
+      _currentSetProgress = 0;
     });
   }
 
@@ -78,7 +81,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
       if (_currentIndex < _allExercises.length - 1) {
         _currentIndex++;
-        _currentSetProgress = 0; // Reset set counter for the next exercise
+        _currentSetProgress = 0;
       } else {
         _showFinishDialog();
       }
@@ -91,8 +94,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         _currentSetProgress++;
       });
 
-      // AUTO-COMPLETE LOGIC:
-      // If we just finished the last set, complete the exercise and move on.
       if (_currentSetProgress == maxSets) {
         Future.delayed(const Duration(milliseconds: 300), () {
           _nextExercise(markComplete: true);
@@ -101,18 +102,22 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     }
   }
 
+  // Inside ActiveWorkoutScreen.dart
+
   void _showFinishDialog() {
     _sessionTimer?.cancel();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Workout Complete!"),
+        title: const Text("Workout Complete! 🎉"),
         content: Text("You finished in ${_formatDuration(_elapsedTime)}"),
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
+              Navigator.pop(context); // Closes the dialog
+
+              // 👇 CRITICAL FIX: Add 'true' here to tell the previous screen we finished!
+              Navigator.pop(context, true);
             },
             child: const Text("OK"),
           )
@@ -130,8 +135,13 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
   @override
   Widget build(BuildContext context) {
-    double progress = _completedIndices.length / _allExercises.length;
-    if (_allExercises.isEmpty) return const Scaffold(body: Center(child: Text("No exercises found")));
+    double progress = _allExercises.isEmpty ? 0 : _completedIndices.length / _allExercises.length;
+
+    if (_allExercises.isEmpty) {
+      return const Scaffold(
+        body: Center(child: Text("No exercises found in this plan.")),
+      );
+    }
 
     final currentExerciseObj = _allExercises[_currentIndex];
 
@@ -170,7 +180,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       ),
       body: Column(
         children: [
-          // Header Section
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
@@ -215,7 +224,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
           const SizedBox(height: 20),
 
-          // Scrollable Content
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -252,15 +260,14 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     );
   }
 
-  // ---------------- WIDGETS ---------------- //
-
   Widget _buildCurrentExerciseCard(ExerciseWithCategory exerciseData) {
-    bool isMain = exerciseData.category == "Main";
+    // 👇 Logic to determine if it's a strength exercise with sets
+    bool isStrength = exerciseData.exercise.sets > 0;
 
-    // MOCK DATA
-    int totalSets = 4;
-    String reps = "12";
-    String weight = "60";
+    // 👇 Pulling real data from your model!
+    int totalSets = exerciseData.exercise.sets;
+    String reps = exerciseData.exercise.reps;
+    String weight = "--"; // Add weight to your model later if you need it!
 
     return Container(
       width: double.infinity,
@@ -280,7 +287,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Row: Title + Counter
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -295,7 +301,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        exerciseData.category,
+                        exerciseData.category, // Now shows the Day name
                         style: const TextStyle(fontSize: 15, color: Colors.grey),
                       ),
                     ],
@@ -317,15 +323,12 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
             const SizedBox(height: 24),
 
-            // -- DYNAMIC CONTENT BASED ON TYPE --
-            if (isMain)
+            if (isStrength)
               _buildMainWorkoutContent(totalSets, reps, weight)
             else
-              _buildDurationContent(),
-
+              _buildDurationContent(exerciseData.exercise.restTime.toInt()),
             const SizedBox(height: 24),
 
-            // -- BOTTOM BUTTONS (Skip / Complete) --
             Row(
               children: [
                 Expanded(
@@ -340,7 +343,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                         ),
                       ),
                       child: const Text(
-                        "Skip Exercise",
+                        "Skip",
                         style: TextStyle(
                           color: Colors.black54,
                           fontSize: 16,
@@ -379,23 +382,20 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     );
   }
 
-  // Layout for "Main" exercises
   Widget _buildMainWorkoutContent(int totalSets, String reps, String weight) {
     return Column(
       children: [
-        // 1. Stats Row
         Row(
           children: [
             Expanded(child: _buildStatBox("Sets", "$_currentSetProgress / $totalSets")),
             const SizedBox(width: 12),
             Expanded(child: _buildStatBox("Reps", reps)),
             const SizedBox(width: 12),
-            Expanded(child: _buildStatBox("Weight", "$weight kg")),
+            Expanded(child: _buildStatBox("Weight", weight)),
           ],
         ),
         const SizedBox(height: 20),
 
-        // 2. Check Posture Button
         SizedBox(
           width: double.infinity,
           height: 54,
@@ -407,9 +407,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               ),
             ),
             child: ElevatedButton.icon(
-              onPressed: () {
-                // Posture check logic
-              },
+              onPressed: () {},
               icon: const Icon(Icons.visibility, color: Colors.white),
               label: const Text("Check Posture", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
               style: ElevatedButton.styleFrom(
@@ -422,7 +420,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         ),
         const SizedBox(height: 12),
 
-        // 3. Complete Set Button
         SizedBox(
           width: double.infinity,
           height: 54,
@@ -452,8 +449,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     );
   }
 
-  // Layout for Warmup/Cooldown
-  Widget _buildDurationContent() {
+  Widget _buildDurationContent(int durationInSeconds) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 20),
@@ -462,15 +458,15 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
-        children: const [
-          Text(
+        children: [
+          const Text(
             "Duration",
             style: TextStyle(color: Colors.grey, fontSize: 13),
           ),
-          SizedBox(height: 6),
+          const SizedBox(height: 6),
           Text(
-            "30 sec",
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: Colors.black87),
+            "$durationInSeconds sec", // Pulls rest time/duration from model
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: Colors.black87),
           ),
         ],
       ),
@@ -652,6 +648,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 }
 
+// 👇 Kept the same, but it now holds your new Exercise model
 class ExerciseWithCategory {
   final Exercise exercise;
   final String category;

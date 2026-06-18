@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart'; // 👈 Added this!
 import '../../onboarding/screens/profile_setup.dart';
 import '../screens/login_screen.dart';
+
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
 
@@ -17,10 +19,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmPasswordController = TextEditingController();
 
-  // Logic: Function to send data to Rola's backend
+  // Logic: Function to send data to Rola's backend AND auto-login
   Future<void> sendRegistration() async {
     final url = Uri.parse("http://10.0.2.2:8081/user/register");
+
     try {
+      // 1️⃣ SEND REGISTRATION REQUEST
       final response = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
@@ -35,12 +39,44 @@ class _SignUpScreenState extends State<SignUpScreen> {
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const ProfileSetupScreen()),
+        print("✅ Account Created! Now auto-logging in...");
+
+        // 2️⃣ AUTO-LOGIN IMMEDIATELY AFTER
+        final loginUrl = Uri.parse("http://10.0.2.2:8081/user/login");
+        final loginResponse = await http.post(
+          loginUrl,
+          headers: {"Content-Type": "application/json"},
+          body: jsonEncode({
+            "email": emailController.text.trim(),
+            "password": passwordController.text, // We still have their password from the controller!
+          }),
         );
+
+        if (loginResponse.statusCode == 200) {
+          final Map<String, dynamic> loginData = jsonDecode(loginResponse.body);
+          final dynamic jwtToken = loginData['Token'];
+
+          // 3️⃣ SAVE THE TOKEN
+          if (jwtToken != null) {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('auth_token', jwtToken.toString());
+            print("🔑 Token safely stored!");
+          }
+
+          if (!mounted) return;
+          // 4️⃣ NOW WE NAVIGATE TO ONBOARDING
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const ProfileSetupScreen()),
+          );
+        } else {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Registered, but login failed: ${loginResponse.body}")),
+          );
+        }
       } else {
+        // Registration failed
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Error: ${response.body}")),
@@ -185,9 +221,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
               ),
 
               const SizedBox(height: 24),
-              _SocialButton(text: 'Continue with Google', icon: Icons.g_mobiledata_rounded),
+              const _SocialButton(text: 'Continue with Google', icon: Icons.g_mobiledata_rounded),
               const SizedBox(height: 16),
-              _SocialButton(text: 'Continue with Apple', icon: Icons.apple),
+              const _SocialButton(text: 'Continue with Apple', icon: Icons.apple),
 
               const SizedBox(height: 32),
               Center(
@@ -197,7 +233,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     const Text('Already have an account? '),
                     GestureDetector(
                       onTap: () {
-                        // Navigates to the SignInScreen when tapped 🚀
                         Navigator.push(
                           context,
                           MaterialPageRoute(builder: (context) => const SignInScreen()),

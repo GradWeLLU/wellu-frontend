@@ -22,4 +22,19 @@ class AppGradients {
       Color(0xFFE91E63),
     ],
   );
+
+  // 🔹 ADD THESE FOR THE NEW FEATURES 🔹
+  static const steps = LinearGradient(
+    colors: [
+      Color(0xFF00C853), // Neon Green
+      Color(0xFF64DD17), // Lighter Green
+    ],
+  );
+
+  static const calories = LinearGradient(
+    colors: [
+      Color(0xFFFF3D00), // Fiery Orange
+      Color(0xFFFF9100), // Amber
+    ],
+  );
 }

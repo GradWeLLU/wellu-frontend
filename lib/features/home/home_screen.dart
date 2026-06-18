@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_gradients.dart';
 import '../workout/screens/workout_plan_screen.dart';
+import '../educational/screens/education_screen.dart';
+
+import '../workout/services/workout_service.dart'; // Make sure this is imported
 import '../../ai_chat/chat_screen.dart';
 import '../../meals/meal_plan_screen.dart';
 // ADDED IMPORT HERE: Update the path if you placed the file in a different folder
@@ -16,11 +19,12 @@ import 'widgets/greeting_section.dart';
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      bottomNavigationBar: _buildBottomNavigation(),
+      bottomNavigationBar: _buildBottomNavigation(context),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -31,7 +35,7 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 20),
 
               /// 🔹 Greeting
-              const GreetingSection(name: "tawfik"),
+              const GreetingSection(name: "Tawfik"),
 
               const SizedBox(height: 30),
 
@@ -90,19 +94,21 @@ class HomeScreen extends StatelessWidget {
               ),
 
               /// 🔹 Workout Plan Feature
+            /// 🔹 Workout Plan Feature
               FeatureCard(
                 title: "Your Workout Plan",
-                subtitle: "30 min strength training",
+                subtitle: "View your weekly schedule",
                 buttonText: "Open Workout Plan",
                 buttonGradient: AppGradients.workout,
                 onPressed: () {
+                  // Just navigate straight to the screen!
+                  // The WorkoutPlanScreen handles its own loading and fetching now. 🛠️
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => const WorkoutPlanScreen(),
                     ),
                   );
-
                 },
               ),
 
@@ -132,14 +138,40 @@ class HomeScreen extends StatelessWidget {
   }
 
   /// 🔹 Bottom Navigation
-  Widget _buildBottomNavigation() {
+
+  /// 🔹 Bottom Navigation
+  Widget _buildBottomNavigation(BuildContext context) {
     return BottomNavigationBar(
       type: BottomNavigationBarType.fixed,
-      currentIndex: 0,
+      currentIndex: 0, // 0 because this is the Home screen
       selectedItemColor: AppColors.stepsGreen,
       unselectedItemColor: Colors.grey,
       showSelectedLabels: true,
       showUnselectedLabels: true,
+
+      // 🔹 Add the onTap navigation here!
+      onTap: (index) {
+        if (index == 0) {
+          // Already on Home, do nothing
+          return;
+        } else if (index == 1) {
+          // Navigate to Learning (Education Screen)
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              // Replace "dummy_id" with your actual user ID logic later!
+              builder: (context) => const EducationScreen(userId: "dummy_id"),
+            ),
+          );
+        } else if (index == 2) {
+          // Navigate to Dashboard (When ready)
+        } else if (index == 3) {
+          // Navigate to Community (When ready)
+        } else if (index == 4) {
+          // Navigate to Profile (When ready)
+        }
+      },
+
       items: const [
         BottomNavigationBarItem(
           icon: Icon(Icons.home),

@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import '../services/workout_service.dart';
-import '../models/workout_plan_model.dart';
-import 'active_workout_screen.dart';
-import 'weekly_workout_plan_screen.dart'; // Added this import
+import 'package:http/http.dart' as http;
 
+import '../models/workout_plan_model2.dart'; // Keep your models here
+import 'ActiveWorkoutScreen2.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 class WorkoutPlanScreen extends StatefulWidget {
   const WorkoutPlanScreen({super.key});
 
@@ -12,39 +14,76 @@ class WorkoutPlanScreen extends StatefulWidget {
 }
 
 class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
-
-  late WorkoutService _service;
-
-  WorkoutPlan? _plan;
+  WorkoutResponse? _workoutResponse;
   bool _isLoading = true;
   String? _error;
+
+  int _currentDayIndex = 0;
+  final Set<int> _completedDays = {};
 
   @override
   void initState() {
     super.initState();
-    _service = WorkoutService();
     _loadWorkout();
   }
-
   Future<void> _loadWorkout() async {
-    try {
-      final plan = await _service.fetchWorkoutPlan();
+    const String apiUrl = 'http://10.0.2.2:8082/workouts/plans';
+    final prefs = await SharedPreferences.getInstance();
+    final String? myToken = prefs.getString('auth_token');
 
+    if (myToken == null) {
       setState(() {
-        _plan = plan;
+        _error = "Session expired. Please log in again.";
         _isLoading = false;
       });
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse(apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $myToken',
+        },
+      );
+
+      // Debugging logs to verify what we're getting
+      print("🌐 STATUS: ${response.statusCode}");
+      print("📦 BODY: ${response.body}");
+
+      if (response.statusCode == 200) {
+        final dynamic decodedData = json.decode(response.body);
+
+        setState(() {
+          // 🚨 CRITICAL FIX: Handle the List from the backend
+          if (decodedData is List && decodedData.isNotEmpty) {
+            // Take the first plan in the list
+            _workoutResponse = WorkoutResponse.fromJson(decodedData[0]);
+          } else if (decodedData is Map<String, dynamic>) {
+            // If the backend ever changes to send a single object
+            _workoutResponse = WorkoutResponse.fromJson(decodedData);
+          } else {
+            _error = "No workout plans found.";
+          }
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _error = "Server error (${response.statusCode})";
+          _isLoading = false;
+        });
+      }
     } catch (e) {
+      print("🚨 MODEL MAPPING ERROR: $e");
       setState(() {
-        _error = e.toString();
+        _error = "Failed to process workout data.";
         _isLoading = false;
       });
     }
   }
-
   @override
   Widget build(BuildContext context) {
-
     if (_isLoading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -54,12 +93,19 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
     if (_error != null) {
       return Scaffold(
         body: Center(
-          child: Text("Error loading workout"),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Text(
+              "Error: $_error",
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.redAccent, fontSize: 16),
+            ),
+          ),
         ),
       );
     }
 
-    if (_plan == null) {
+    if (_workoutResponse == null) {
       return const SizedBox();
     }
 
@@ -78,106 +124,107 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
           ),
         ),
       ),
-
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             _buildSummaryCard(),
             const SizedBox(height: 20),
 
             _buildProgressCard(),
             const SizedBox(height: 20),
 
-            _buildSection(
-              title: "Warm-up",
-              subtitle: "Prepare your body",
-              exercises: _plan!.warmup,
-            ),
-
-            const SizedBox(height: 20),
-
-            _buildSection(
-              title: "Main Exercises",
-              subtitle: "Build strength and endurance",
-              exercises: _plan!.main,
-            ),
-
-            const SizedBox(height: 20),
-
-            _buildSection(
-              title: "Cooldown",
-              subtitle: "Recover and relax",
-              exercises: _plan!.cooldown,
-            ),
-
-            const SizedBox(height: 20),
-
-            _buildTipsCard(),
+            ..._workoutResponse!.days.map((dayPlan) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: _buildSection(
+                  title: dayPlan.day,
+                  subtitle: dayPlan.focus,
+                  exercises: dayPlan.exercises,
+                ),
+              );
+            }).toList(),
 
             const SizedBox(height: 140),
           ],
         ),
       ),
-
       bottomNavigationBar: _buildBottomActions(),
     );
   }
 
-  // ─────────────────────────────
+// ─────────────────────────────
 
   Widget _buildSummaryCard() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 24),
       decoration: _cardDecoration(),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        // We don't need spaceEvenly anymore because Expanded will divide the space perfectly!
         children: [
-          SummaryItem(
-            icon: Icons.access_time,
-            value: "${_plan!.duration} min",
-            label: "Duration",
-            gradient: const [Color(0xFF4FACFE), Color(0xFF00F2FE)],
+          Expanded(
+            child: SummaryItem(
+              icon: Icons.fitness_center,
+              value: _workoutResponse!.planType,
+              label: "Type",
+              gradient: const [Color(0xFF4FACFE), Color(0xFF00F2FE)],
+            ),
           ),
-          SummaryItem(
-            icon: Icons.trending_up,
-            value: _plan!.difficulty,
-            label: "Difficulty",
-            gradient: const [Color(0xFFFFA726), Color(0xFFFF7043)],
+          Expanded(
+            child: SummaryItem(
+              icon: Icons.trending_up,
+              value: _workoutResponse!.difficulty,
+              label: "Difficulty",
+              gradient: const [Color(0xFFFFA726), Color(0xFFFF7043)],
+            ),
           ),
-          SummaryItem(
-            icon: Icons.local_fire_department,
-            value: "${_plan!.calories} kcal",
-            label: "Est. Burn",
-            gradient: const [Color(0xFF66BB6A), Color(0xFF00C853)],
+          Expanded(
+            child: SummaryItem(
+              icon: Icons.calendar_view_week,
+              value: _workoutResponse!.weeklySplit,
+              label: "Split",
+              gradient: const [Color(0xFF66BB6A), Color(0xFF00C853)],
+            ),
           ),
         ],
       ),
     );
   }
-
+// 👇 1. UPDATE THE PROGRESS CARD TO SHOW REAL PROGRESS
   Widget _buildProgressCard() {
+    // Calculate real progress based on completed days
+    double progress = _workoutResponse!.days.isEmpty
+        ? 0.0
+        : _completedDays.length / _workoutResponse!.days.length;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Workout Progress",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Workout Progress",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              Text(
+                "${_completedDays.length} / ${_workoutResponse!.days.length} Days",
+                style: const TextStyle(color: Color(0xFF22E1A0), fontWeight: FontWeight.bold),
+              )
+            ],
           ),
           const SizedBox(height: 14),
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: const LinearProgressIndicator(
-              value: 0.0,
+            child: LinearProgressIndicator(
+              value: progress, // 👈 Now uses real progress!
               minHeight: 10,
-              backgroundColor: Color(0xFFE5E5E5),
-              valueColor:
-              AlwaysStoppedAnimation<Color>(Color(0xFF22E1A0)),
+              backgroundColor: const Color(0xFFE5E5E5),
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF22E1A0)),
             ),
           ),
         ],
@@ -196,7 +243,6 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
           Text(
             title,
             style: const TextStyle(
@@ -213,9 +259,7 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
               color: Color(0xFF8E8E8E),
             ),
           ),
-
           const SizedBox(height: 16),
-
           ...exercises.map((e) => _buildExerciseTile(e)).toList(),
         ],
       ),
@@ -248,53 +292,32 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
             ),
           ),
           const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                exercise.name,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  exercise.name,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                exercise.detail,
-                style: const TextStyle(
-                  color: Color(0xFF8E8E8E),
-                  fontSize: 14,
+                const SizedBox(height: 4),
+                Text(
+                  "${exercise.sets} Sets • ${exercise.reps} Reps • ${exercise.restTime}s Rest",
+                  style: const TextStyle(
+                    color: Color(0xFF8E8E8E),
+                    fontSize: 14,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildTipsCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF22E1A0).withOpacity(0.15),
-            const Color(0xFF1E88E5).withOpacity(0.15),
-          ],
-        ),
-        border: Border.all(
-          color: const Color(0xFF22E1A0).withOpacity(0.3),
-        ),
-      ),
-      child: Text(
-        "💪 Workout Tips\n\n${_plan!.tip}",
-        style: const TextStyle(fontSize: 14, color: Colors.black87),
-      ),
-    );
-  }
-
   Widget _buildBottomActions() {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
@@ -323,25 +346,56 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
                     Color(0xFF1E88E5),
                   ],
                 ),
-              ),
+              ), // 👈 ADDED MISSING CLOSING BRACKET HERE
+
               child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
+                onPressed: () async {
+                  if (_completedDays.length == _workoutResponse!.days.length) {
+                    // If it's complete, reset everything back to Day 0!
+                    setState(() {
+                      _completedDays.clear();
+                      _currentDayIndex = 0;
+                    });
+                    return; // Stop here so they see the reset before starting again
+                  }
+                  // We wait for the ActiveWorkoutScreen to pop back...
+                  final isFinished = await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => ActiveWorkoutScreen(plan: _plan!),
+                      builder: (_) => ActiveWorkoutScreen(
+                        plan: _workoutResponse!,
+                        dayIndex: _currentDayIndex, // Passes the current day!
+                      ),
                     ),
                   );
+
+                  // If it returns true, that means they finished the day!
+                  if (isFinished == true) {
+                    setState(() {
+                      // Mark this day as done
+                      _completedDays.add(_currentDayIndex);
+
+                      // Move to the next day (if they haven't reached the end of the week)
+                      if (_currentDayIndex < _workoutResponse!.days.length - 1) {
+                        _currentDayIndex++;
+                      }
+                    });
+                  }
                 },
                 icon: const Icon(Icons.play_arrow, color: Colors.white),
-                label: const Text(
-                  "Start Workout",
-                  style: TextStyle(
+                label: Text(
+                  // Dynamically change text based on completion
+                  _completedDays.length == _workoutResponse!.days.length
+                      ? "Plan Completed! 🎉"
+                      : "Start Day ${_currentDayIndex + 1}",
+
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+                // 👈 ADDED BUTTON STYLING BACK SO THE GRADIENT SHOWS!
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
@@ -356,21 +410,19 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
           _outlineActionButton(
             icon: Icons.visibility_outlined,
             text: "Preview Exercises",
-            onPressed: () {
-              // Add preview logic here later
-            },
+            onPressed: () {},
           ),
           const SizedBox(height: 14),
           _outlineActionButton(
             icon: Icons.calendar_today_outlined,
             text: "View Weekly Plan",
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const WeeklyWorkoutPlanScreen(),
-                ),
-              );
+              //Navigator.push(
+              //context
+              //MaterialPageRoute(
+              //builder: (context) => const WeeklyWorkoutPlanScreen(),
+              //),
+              // );
             },
           ),
         ],
@@ -378,7 +430,6 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
     );
   }
 
-  // --- ADDED onPressed PARAMETER HERE ---
   Widget _outlineActionButton({
     required IconData icon,
     required String text,
@@ -388,7 +439,7 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
       width: double.infinity,
       height: 56,
       child: OutlinedButton.icon(
-        onPressed: onPressed, // --- APPLIED onPressed HERE ---
+        onPressed: onPressed,
         icon: Icon(icon, color: Colors.black54),
         label: Text(
           text,
