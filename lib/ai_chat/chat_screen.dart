@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_gradients.dart';
 import '../../core/theme/app_colors.dart';
 
@@ -13,6 +16,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
+  bool _isSending = false;
+
   List<_Message> messages = [
     _Message(
       text: "Hello! I'm your WellU AI coach. How can I help you today?",
@@ -25,25 +30,86 @@ class _ChatScreenState extends State<ChatScreen> {
     ),
   ];
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _isSending) return;
 
     setState(() {
       messages.add(_Message(text: text, isUser: true));
+      _isSending = true;
     });
 
     _controller.clear();
     _scrollToBottom();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      if (token == null) {
+        setState(() {
+          messages.add(_Message(
+            text: "You need to be logged in to chat. Please log in again.",
+            isUser: false,
+          ));
+          _isSending = false;
+        });
+        _scrollToBottom();
+        return;
+      }
+
+      final url = Uri.parse("http://10.0.2.2:8002/chat");
+
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "token": token,
+          "message": text,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        final String aiReply = responseData['response'] ??
+            "Sorry, I didn't understand that.";
+
+        setState(() {
+          messages.add(_Message(text: aiReply, isUser: false));
+        });
+      } else {
+        setState(() {
+          messages.add(_Message(
+            text: "Something went wrong. Please try again.",
+            isUser: false,
+          ));
+        });
+      }
+    } catch (e) {
+      print("🚨 CHAT ERROR: $e");
+      setState(() {
+        messages.add(_Message(
+          text: "I'm having trouble connecting right now. Please check your connection and try again.",
+          isUser: false,
+        ));
+      });
+    } finally {
+      setState(() {
+        _isSending = false;
+      });
+      _scrollToBottom();
+    }
   }
 
   void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
@@ -135,8 +201,11 @@ class _ChatScreenState extends State<ChatScreen> {
               child: ListView.builder(
                 controller: _scrollController,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: messages.length,
+                itemCount: messages.length + (_isSending ? 1 : 0),
                 itemBuilder: (context, index) {
+                  if (index == messages.length && _isSending) {
+                    return const _TypingIndicator();
+                  }
                   final message = messages[index];
                   return _ChatBubble(
                     text: message.text,
@@ -167,6 +236,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 hintText: "Type your question...",
                                 border: InputBorder.none,
                               ),
+                              onSubmitted: (_) => _sendMessage(),
                             ),
                           ),
                           const Icon(Icons.mic, color: Colors.grey),
@@ -184,7 +254,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.send, color: Colors.white),
-                      onPressed: _sendMessage,
+                      onPressed: _isSending ? null : _sendMessage,
                     ),
                   ),
                 ],
@@ -197,10 +267,35 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
+/// Simple typing indicator shown while waiting for AI response
+class _TypingIndicator extends StatelessWidget {
+  const _TypingIndicator();
 
-
-
-
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 6,
+            )
+          ],
+        ),
+        child: const Text(
+          "Typing...",
+          style: TextStyle(color: Colors.black54),
+        ),
+      ),
+    );
+  }
+}
 
 /// 🧠 SMART GRADIENT CARD WITH ANIMATION
 class _SmartGradientCard extends StatefulWidget {
@@ -220,7 +315,7 @@ class _SmartGradientCardState extends State<_SmartGradientCard>
     "Consistency beats intensity.",
     "Small steps create big change.",
     "Discipline builds confidence.",
-    "You’re building strength daily.",
+    "You're building strength daily.",
     "Progress > Perfection."
   ];
 
@@ -311,22 +406,12 @@ class _SmartGradientCardState extends State<_SmartGradientCard>
   }
 }
 
-
-
-
-
-
 class _Message {
   final String text;
   final bool isUser;
 
   _Message({required this.text, required this.isUser});
 }
-
-
-
-
-
 
 class _ChatBubble extends StatelessWidget {
   final String text;
