@@ -5,7 +5,7 @@ import '../../core/theme/app_gradients.dart';
 import '../workout/screens/workout_plan_screen.dart';
 import '../educational/screens/education_screen.dart';
 
-import '../workout/services/workout_service.dart'; // Make sure this is imported
+// Make sure this is imported
 import '../../ai_chat/chat_screen.dart';
 import '../../meals/meal_plan_screen.dart';
 // ADDED IMPORT HERE: Update the path if you placed the file in a different folder
