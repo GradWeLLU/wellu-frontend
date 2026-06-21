@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-
-import '../models/workout_plan_model2.dart'; // Keep your models here
-import 'ActiveWorkoutScreen2.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
+
+import '../models/workout_plan_model2.dart';
+import 'ActiveWorkoutScreen2.dart'; // Ensure this points to the file above!
+import 'workout_history_screen.dart'; // Make sure you created this file!
+
 class WorkoutPlanScreen extends StatefulWidget {
   const WorkoutPlanScreen({super.key});
 
@@ -18,6 +19,9 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
   bool _isLoading = true;
   String? _error;
 
+  // 🔄 Toggle State!
+  bool isPlanSelected = true;
+
   int _currentDayIndex = 0;
   final Set<int> _completedDays = {};
 
@@ -26,6 +30,7 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
     super.initState();
     _loadWorkout();
   }
+
   Future<void> _loadWorkout() async {
     const String apiUrl = 'http://10.0.2.2:8082/workouts/plans';
     final prefs = await SharedPreferences.getInstance();
@@ -48,7 +53,6 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
         },
       );
 
-      // Debugging logs to verify what we're getting
       print("🌐 STATUS: ${response.statusCode}");
       print("📦 BODY: ${response.body}");
 
@@ -56,12 +60,9 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
         final dynamic decodedData = json.decode(response.body);
 
         setState(() {
-          // 🚨 CRITICAL FIX: Handle the List from the backend
           if (decodedData is List && decodedData.isNotEmpty) {
-            // Take the first plan in the list
             _workoutResponse = WorkoutResponse.fromJson(decodedData[0]);
           } else if (decodedData is Map<String, dynamic>) {
-            // If the backend ever changes to send a single object
             _workoutResponse = WorkoutResponse.fromJson(decodedData);
           } else {
             _error = "No workout plans found.";
@@ -82,6 +83,7 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
       });
     }
   }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -124,44 +126,121 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSummaryCard(),
-            const SizedBox(height: 20),
+      body: Column(
+        children: [
+          // 🎚️ The Toggle Switch
+          _buildToggleSwitch(),
 
-            _buildProgressCard(),
-            const SizedBox(height: 20),
-
-            ..._workoutResponse!.days.map((dayPlan) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 20),
-                child: _buildSection(
-                  title: dayPlan.day,
-                  subtitle: dayPlan.focus,
-                  exercises: dayPlan.exercises,
-                ),
-              );
-            }).toList(),
-
-            const SizedBox(height: 140),
-          ],
-        ),
+          // 🔀 Swaps between Plan and Logs!
+          // 🔀 Swaps between Plan and Logs!
+          Expanded(
+            child: isPlanSelected
+                ? _buildPlanView()
+                : const SingleChildScrollView(child: WorkoutHistoryScreen()), // 👈 Changed here!
+          ),
+        ],
       ),
-      bottomNavigationBar: _buildBottomActions(),
+      // Only show the "Start Workout" button if we are looking at the plan!
+      bottomNavigationBar: isPlanSelected ? _buildBottomActions() : null,
     );
   }
 
-// ─────────────────────────────
+  Widget _buildToggleSwitch() {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 10),
+        height: 45,
+        width: 250,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(25),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10
+            )
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => isPlanSelected = true),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: isPlanSelected ? const LinearGradient(colors: [Color(0xFF22E1A0), Color(0xFF1E88E5)]) : null,
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                      "Plan",
+                      style: TextStyle(
+                          color: isPlanSelected ? Colors.white : Colors.grey,
+                          fontWeight: FontWeight.bold
+                      )
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => isPlanSelected = false),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: !isPlanSelected ? const LinearGradient(colors: [Color(0xFF22E1A0), Color(0xFF1E88E5)]) : null,
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                      "Logs",
+                      style: TextStyle(
+                          color: !isPlanSelected ? Colors.white : Colors.grey,
+                          fontWeight: FontWeight.bold
+                      )
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlanView() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSummaryCard(),
+          const SizedBox(height: 20),
+
+          _buildProgressCard(),
+          const SizedBox(height: 20),
+
+          ..._workoutResponse!.days.map((dayPlan) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: _buildSection(
+                title: dayPlan.day,
+                subtitle: dayPlan.focus,
+                exercises: dayPlan.exercises,
+              ),
+            );
+          }).toList(),
+
+          const SizedBox(height: 140),
+        ],
+      ),
+    );
+  }
 
   Widget _buildSummaryCard() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 24),
       decoration: _cardDecoration(),
       child: Row(
-        // We don't need spaceEvenly anymore because Expanded will divide the space perfectly!
         children: [
           Expanded(
             child: SummaryItem(
@@ -191,9 +270,8 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
       ),
     );
   }
-// 👇 1. UPDATE THE PROGRESS CARD TO SHOW REAL PROGRESS
+
   Widget _buildProgressCard() {
-    // Calculate real progress based on completed days
     double progress = _workoutResponse!.days.isEmpty
         ? 0.0
         : _completedDays.length / _workoutResponse!.days.length;
@@ -221,7 +299,7 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: LinearProgressIndicator(
-              value: progress, // 👈 Now uses real progress!
+              value: progress,
               minHeight: 10,
               backgroundColor: const Color(0xFFE5E5E5),
               valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF22E1A0)),
@@ -318,6 +396,7 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
       ),
     );
   }
+
   Widget _buildBottomActions() {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
@@ -346,36 +425,31 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
                     Color(0xFF1E88E5),
                   ],
                 ),
-              ), // 👈 ADDED MISSING CLOSING BRACKET HERE
-
+              ),
               child: ElevatedButton.icon(
                 onPressed: () async {
                   if (_completedDays.length == _workoutResponse!.days.length) {
-                    // If it's complete, reset everything back to Day 0!
                     setState(() {
                       _completedDays.clear();
                       _currentDayIndex = 0;
                     });
-                    return; // Stop here so they see the reset before starting again
+                    return;
                   }
-                  // We wait for the ActiveWorkoutScreen to pop back...
+
                   final isFinished = await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => ActiveWorkoutScreen(
                         plan: _workoutResponse!,
-                        dayIndex: _currentDayIndex, // Passes the current day!
+                        dayIndex: _currentDayIndex,
                       ),
                     ),
                   );
 
-                  // If it returns true, that means they finished the day!
                   if (isFinished == true) {
                     setState(() {
-                      // Mark this day as done
                       _completedDays.add(_currentDayIndex);
 
-                      // Move to the next day (if they haven't reached the end of the week)
                       if (_currentDayIndex < _workoutResponse!.days.length - 1) {
                         _currentDayIndex++;
                       }
@@ -384,7 +458,6 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
                 },
                 icon: const Icon(Icons.play_arrow, color: Colors.white),
                 label: Text(
-                  // Dynamically change text based on completion
                   _completedDays.length == _workoutResponse!.days.length
                       ? "Plan Completed! 🎉"
                       : "Start Day ${_currentDayIndex + 1}",
@@ -395,7 +468,6 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                // 👈 ADDED BUTTON STYLING BACK SO THE GRADIENT SHOWS!
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
@@ -416,14 +488,7 @@ class _WorkoutPlanScreenState extends State<WorkoutPlanScreen> {
           _outlineActionButton(
             icon: Icons.calendar_today_outlined,
             text: "View Weekly Plan",
-            onPressed: () {
-              //Navigator.push(
-              //context
-              //MaterialPageRoute(
-              //builder: (context) => const WeeklyWorkoutPlanScreen(),
-              //),
-              // );
-            },
+            onPressed: () {},
           ),
         ],
       ),

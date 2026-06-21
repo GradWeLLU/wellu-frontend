@@ -42,23 +42,7 @@ class HomeScreen extends StatelessWidget {
 
 
 
-              const StatCard(
-                icon: Icons.local_fire_department,
-                iconBgColor: AppColors.caloriesOrange,
-                title: "Calories",
-                value: "420 / 600 cal",
-                progress: 0.9,
-                progressColor: AppColors.caloriesOrange,
-              ),
 
-              const StatCard(
-                icon: Icons.fitness_center,
-                iconBgColor: AppColors.workoutBlue,
-                title: "Workout",
-                value: "15 / 30 min",
-                progress: 0.5,
-                progressColor: AppColors.workoutBlue,
-              ),
 
               const SizedBox(height: 10),
 

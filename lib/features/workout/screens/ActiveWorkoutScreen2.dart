@@ -1,27 +1,31 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import '../models/workout_plan_model2.dart'; // Make sure this points to your new models!
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/workout_plan_model2.dart';
 
 class ActiveWorkoutScreen extends StatefulWidget {
-  // 👇 Updated to use WorkoutResponse
   final WorkoutResponse plan;
-  final int dayIndex; // 👈 Add this!
-  const ActiveWorkoutScreen({super.key, required this.plan,required this.dayIndex});
+  final int dayIndex;
+
+  const ActiveWorkoutScreen({super.key, required this.plan, required this.dayIndex});
 
   @override
   State<ActiveWorkoutScreen> createState() => _ActiveWorkoutScreenState();
 }
 
 class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
-  // Logic Variables
   late List<ExerciseWithCategory> _allExercises;
   int _currentIndex = 0;
   final Set<int> _completedIndices = {};
 
-  // Track sets for the current specific exercise
   int _currentSetProgress = 0;
 
-  // Timer Variables
+  final TextEditingController _weightController = TextEditingController();
+  List<Map<String, dynamic>> _recordedSets = [];
+  bool _isLogging = false;
+
   Timer? _sessionTimer;
   Duration _elapsedTime = Duration.zero;
   bool _isPaused = false;
@@ -36,13 +40,12 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   @override
   void dispose() {
     _sessionTimer?.cancel();
+    _weightController.dispose();
     super.dispose();
   }
 
   void _flattenExercises() {
     _allExercises = [];
-
-    // 👇 Now it ONLY looks at the specific day you pass to it!
     var selectedDayPlan = widget.plan.days[widget.dayIndex];
 
     for (var exercise in selectedDayPlan.exercises) {
@@ -70,6 +73,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     setState(() {
       _currentIndex = index;
       _currentSetProgress = 0;
+      _recordedSets.clear();
+      _weightController.clear();
     });
   }
 
@@ -82,27 +87,174 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       if (_currentIndex < _allExercises.length - 1) {
         _currentIndex++;
         _currentSetProgress = 0;
+        _recordedSets.clear();
+        _weightController.clear();
       } else {
         _showFinishDialog();
       }
     });
   }
 
-  void _incrementSet(int maxSets) {
+  // 📡 IMPROVED: Actually returns true/false and shows backend errors!
+  Future<bool> _logExerciseToBackend(ExerciseWithCategory exerciseData) async {
+    setState(() {
+      _isLogging = true;
+    });
+
+    final prefs = await SharedPreferences.getInstance();
+    final String? myToken = prefs.getString('auth_token');
+
+    if (myToken == null) {
+      setState(() => _isLogging = false);
+      return false;
+    }
+
+    try {
+      final String todayDate = DateTime.now().toIso8601String().split('T')[0];
+      String prefKey = 'workout_log_uuid_$todayDate';
+      String? currentLogId = prefs.getString(prefKey);
+
+      // 1️⃣ Fetch ID if not in SharedPreferences
+      if (currentLogId == null) {
+        final getLogsRes = await http.get(
+          Uri.parse('http://10.0.2.2:8081/exerciseLogs'),
+          headers: {'Authorization': 'Bearer $myToken'},
+        );
+        if (getLogsRes.statusCode == 200) {
+          final List<dynamic> logs = json.decode(getLogsRes.body);
+          for (var log in logs) {
+            if (log['workoutDate'] == todayDate) {
+              currentLogId = (log['id'] ?? log['logId']).toString();
+              await prefs.setString(prefKey, currentLogId!);
+              break;
+            }
+          }
+        }
+      }
+
+      // 2️⃣ Create Log if it doesn't exist
+      if (currentLogId == null) {
+        final createLogRes = await http.post(
+          Uri.parse('http://10.0.2.2:8081/exerciseLogs'),
+          headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $myToken'},
+          body: json.encode({'workoutDate': todayDate}),
+        );
+        if (createLogRes.statusCode == 200 || createLogRes.statusCode == 201) {
+          final newLog = json.decode(createLogRes.body);
+          currentLogId = (newLog['id'] ?? newLog['logId']).toString();
+          await prefs.setString(prefKey, currentLogId!);
+        } else {
+          _showErrorDialog("Failed to create daily log: ${createLogRes.body}");
+          return false;
+        }
+      }
+
+      // 3️⃣ Format the Entry Body safely based on type
+      bool isStrength = exerciseData.exercise.sets > 0;
+      Map<String, dynamic> entryBody;
+
+      if (isStrength) {
+        entryBody = {
+          "exerciseName": exerciseData.exercise.name,
+          "type": "STRENGTH", // You can switch this to whatever Enum Spring expects
+          "sets": _recordedSets,
+        };
+      } else {
+        // Cardio payload structure
+        entryBody = {
+          "exerciseName": exerciseData.exercise.name,
+          "type": "CARDIO",
+          "durationMinutes": 30, // You can replace this with actual timer values later
+          "distanceKm": 5,
+          "burnedCalories": 300
+        };
+      }
+
+      print("📤 SENDING BODY: ${json.encode(entryBody)}");
+
+      // 4️⃣ Add the Exercise
+      final addEntryRes = await http.post(
+        Uri.parse('http://10.0.2.2:8081/exerciseLogs/addEntry/$currentLogId'),
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $myToken'},
+        body: json.encode(entryBody),
+      );
+
+      if (addEntryRes.statusCode == 200 || addEntryRes.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Exercise logged! 💪'), backgroundColor: Colors.green)
+        );
+        return true; // Success!
+      } else {
+        // 🚨 THIS IS WHERE IT WAS FAILING SILENTLY. NOW IT WILL SHOW YOU WHY!
+        _showErrorDialog("Spring Boot Error (${addEntryRes.statusCode}):\n${addEntryRes.body}");
+        return false;
+      }
+    } catch (e) {
+      _showErrorDialog("App Error: $e");
+      return false;
+    } finally {
+      if (mounted) {
+        setState(() => _isLogging = false);
+      }
+    }
+  }
+
+  // Helper to show backend errors clearly
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Failed to Save 🚨"),
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+        ],
+      ),
+    );
+  }
+
+  void _incrementSet(int maxSets, String targetReps) async {
     if (_currentSetProgress < maxSets) {
+      double weight = double.tryParse(_weightController.text) ?? 0.0;
+      int reps = int.tryParse(targetReps.split('-').first) ?? 10;
+
+      _recordedSets.add({
+        "reps": reps,
+        "weight": weight
+      });
+
       setState(() {
         _currentSetProgress++;
       });
 
       if (_currentSetProgress == maxSets) {
-        Future.delayed(const Duration(milliseconds: 300), () {
-          _nextExercise(markComplete: true);
-        });
+        // Wait to see if it successfully saves!
+        bool success = await _logExerciseToBackend(_allExercises[_currentIndex]);
+
+        if (success) {
+          Future.delayed(const Duration(milliseconds: 300), () {
+            _nextExercise(markComplete: true);
+          });
+        } else {
+          // If it failed, rewind the set counter so you can try again!
+          setState(() {
+            _currentSetProgress--;
+            _recordedSets.removeLast();
+          });
+        }
+      } else {
+        _weightController.clear();
       }
     }
   }
 
-  // Inside ActiveWorkoutScreen.dart
+  // 🏃‍♂️ NEW: Function to finish Cardio exercises
+  void _completeCardioExercise() async {
+    bool success = await _logExerciseToBackend(_allExercises[_currentIndex]);
+    if (success) {
+      _nextExercise(markComplete: true);
+    }
+  }
 
   void _showFinishDialog() {
     _sessionTimer?.cancel();
@@ -114,9 +266,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(context); // Closes the dialog
-
-              // 👇 CRITICAL FIX: Add 'true' here to tell the previous screen we finished!
+              Navigator.pop(context);
               Navigator.pop(context, true);
             },
             child: const Text("OK"),
@@ -221,9 +371,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               ],
             ),
           ),
-
           const SizedBox(height: 20),
-
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -231,15 +379,12 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildCurrentExerciseCard(currentExerciseObj),
-
                   const SizedBox(height: 30),
-
                   const Text(
                     "All Exercises",
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.black87),
                   ),
                   const SizedBox(height: 16),
-
                   ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -261,13 +406,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 
   Widget _buildCurrentExerciseCard(ExerciseWithCategory exerciseData) {
-    // 👇 Logic to determine if it's a strength exercise with sets
     bool isStrength = exerciseData.exercise.sets > 0;
-
-    // 👇 Pulling real data from your model!
     int totalSets = exerciseData.exercise.sets;
     String reps = exerciseData.exercise.reps;
-    String weight = "--"; // Add weight to your model later if you need it!
 
     return Container(
       width: double.infinity,
@@ -275,11 +416,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
+          BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, 10)),
         ],
       ),
       child: Padding(
@@ -295,40 +432,27 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        exerciseData.exercise.name,
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
-                      ),
+                      Text(exerciseData.exercise.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87)),
                       const SizedBox(height: 4),
-                      Text(
-                        exerciseData.category, // Now shows the Day name
-                        style: const TextStyle(fontSize: 15, color: Colors.grey),
-                      ),
+                      Text(exerciseData.category, style: const TextStyle(fontSize: 15, color: Colors.grey)),
                     ],
                   ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF2F4F3),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    "${_currentIndex + 1} / ${_allExercises.length}",
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black54),
-                  ),
+                  decoration: BoxDecoration(color: const Color(0xFFF2F4F3), borderRadius: BorderRadius.circular(20)),
+                  child: Text("${_currentIndex + 1} / ${_allExercises.length}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black54)),
                 ),
               ],
             ),
-
             const SizedBox(height: 24),
 
             if (isStrength)
-              _buildMainWorkoutContent(totalSets, reps, weight)
+              _buildMainWorkoutContent(totalSets, reps)
             else
               _buildDurationContent(exerciseData.exercise.restTime.toInt()),
-            const SizedBox(height: 24),
 
+            const SizedBox(height: 24),
             Row(
               children: [
                 Expanded(
@@ -338,39 +462,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                       onPressed: () => _nextExercise(markComplete: false),
                       style: TextButton.styleFrom(
                         backgroundColor: const Color(0xFFF2F4F3),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
-                      child: const Text(
-                        "Skip",
-                        style: TextStyle(
-                          color: Colors.black54,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: SizedBox(
-                    height: 56,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _nextExercise(markComplete: true),
-                      icon: const Icon(Icons.check, color: Colors.white),
-                      label: const Text(
-                        "Complete",
-                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF131B2C),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        elevation: 0,
-                      ),
+                      child: const Text("Skip", style: TextStyle(color: Colors.black54, fontSize: 16, fontWeight: FontWeight.w600)),
                     ),
                   ),
                 ),
@@ -382,7 +476,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     );
   }
 
-  Widget _buildMainWorkoutContent(int totalSets, String reps, String weight) {
+  Widget _buildMainWorkoutContent(int totalSets, String reps) {
     return Column(
       children: [
         Row(
@@ -390,51 +484,36 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             Expanded(child: _buildStatBox("Sets", "$_currentSetProgress / $totalSets")),
             const SizedBox(width: 12),
             Expanded(child: _buildStatBox("Reps", reps)),
-            const SizedBox(width: 12),
-            Expanded(child: _buildStatBox("Weight", weight)),
           ],
         ),
-        const SizedBox(height: 20),
-
-        SizedBox(
-          width: double.infinity,
-          height: 54,
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              gradient: const LinearGradient(
-                colors: [Color(0xFFB066F5), Color(0xFF7B52FF)],
-              ),
-            ),
-            child: ElevatedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.visibility, color: Colors.white),
-              label: const Text("Check Posture", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-            ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _weightController,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: "Weight lifted (kg)",
+            filled: true,
+            fillColor: const Color(0xFFF8F9FA),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+            prefixIcon: const Icon(Icons.fitness_center),
           ),
         ),
-        const SizedBox(height: 12),
-
+        const SizedBox(height: 20),
         SizedBox(
           width: double.infinity,
           height: 54,
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              gradient: const LinearGradient(
-                colors: [Color(0xFF22E1A0), Color(0xFF1E88E5)],
-              ),
+              gradient: const LinearGradient(colors: [Color(0xFF22E1A0), Color(0xFF1E88E5)]),
             ),
             child: ElevatedButton.icon(
-              onPressed: () => _incrementSet(totalSets),
-              icon: const Icon(Icons.check, color: Colors.white),
+              onPressed: _isLogging ? null : () => _incrementSet(totalSets, reps),
+              icon: _isLogging
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Icon(Icons.check, color: Colors.white),
               label: Text(
-                  _currentSetProgress >= totalSets ? "Done" : "Complete Set",
+                  _isLogging ? "Saving..." : (_currentSetProgress >= totalSets ? "Done" : "Complete Set"),
                   style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)
               ),
               style: ElevatedButton.styleFrom(
@@ -459,14 +538,36 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       ),
       child: Column(
         children: [
-          const Text(
-            "Duration",
-            style: TextStyle(color: Colors.grey, fontSize: 13),
-          ),
+          const Text("Duration", style: TextStyle(color: Colors.grey, fontSize: 13)),
           const SizedBox(height: 6),
-          Text(
-            "$durationInSeconds sec", // Pulls rest time/duration from model
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: Colors.black87),
+          Text("$durationInSeconds sec", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: Colors.black87)),
+          const SizedBox(height: 20),
+
+          // 🏃‍♂️ NEW: Missing Complete button for Cardio!
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: const LinearGradient(colors: [Color(0xFF22E1A0), Color(0xFF1E88E5)]),
+              ),
+              child: ElevatedButton.icon(
+                onPressed: _isLogging ? null : _completeCardioExercise,
+                icon: _isLogging
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.check, color: Colors.white),
+                label: Text(
+                    _isLogging ? "Saving..." : "Complete Cardio",
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -476,21 +577,12 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   Widget _buildStatBox(String label, String value) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FA),
-        borderRadius: BorderRadius.circular(16),
-      ),
+      decoration: BoxDecoration(color: const Color(0xFFF8F9FA), borderRadius: BorderRadius.circular(16)),
       child: Column(
         children: [
-          Text(
-            label,
-            style: const TextStyle(color: Colors.grey, fontSize: 12),
-          ),
+          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
           const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.black87),
-          ),
+          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.black87)),
         ],
       ),
     );
@@ -528,20 +620,13 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         decoration: BoxDecoration(
           color: backgroundColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isActive || isCompleted ? borderColor : Colors.grey.shade200,
-            width: isActive ? 2 : 1,
-          ),
+          border: Border.all(color: isActive || isCompleted ? borderColor : Colors.grey.shade200, width: isActive ? 2 : 1),
         ),
         child: Row(
           children: [
             Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: iconBgColor,
-                shape: BoxShape.circle,
-              ),
+              width: 40, height: 40,
+              decoration: BoxDecoration(color: iconBgColor, shape: BoxShape.circle),
               child: Icon(iconData, color: iconColor, size: 20),
             ),
             const SizedBox(width: 16),
@@ -549,33 +634,17 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item.exercise.name,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: isCompleted || isActive ? FontWeight.w600 : FontWeight.w500,
-                      color: isCompleted ? const Color(0xFF22E1A0) : Colors.black87,
-                    ),
-                  ),
+                  Text(item.exercise.name, style: TextStyle(fontSize: 16, fontWeight: isCompleted || isActive ? FontWeight.w600 : FontWeight.w500, color: isCompleted ? const Color(0xFF22E1A0) : Colors.black87)),
                   const SizedBox(height: 4),
-                  Text(
-                    item.category,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                  ),
+                  Text(item.category, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
                 ],
               ),
             ),
             if (isActive)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1E88E5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  "Active",
-                  style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                ),
+                decoration: BoxDecoration(color: const Color(0xFF1E88E5), borderRadius: BorderRadius.circular(12)),
+                child: const Text("Active", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
               ),
           ],
         ),
@@ -588,13 +657,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))],
       ),
       child: Row(
         children: [
@@ -605,10 +668,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               child: OutlinedButton.icon(
                 onPressed: _togglePause,
                 icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause, color: Colors.black87),
-                label: Text(
-                  _isPaused ? "Resume" : "Pause",
-                  style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
-                ),
+                label: Text(_isPaused ? "Resume" : "Pause", style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600)),
                 style: OutlinedButton.styleFrom(
                   backgroundColor: const Color(0xFFF2F4F3),
                   side: BorderSide.none,
@@ -624,9 +684,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               height: 56,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF22E1A0), Color(0xFF1E88E5)],
-                ),
+                gradient: const LinearGradient(colors: [Color(0xFF22E1A0), Color(0xFF1E88E5)]),
               ),
               child: ElevatedButton(
                 onPressed: _showFinishDialog,
@@ -635,10 +693,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                   shadowColor: Colors.transparent,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
-                child: const Text(
-                  "Finish Workout",
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                ),
+                child: const Text("Finish Workout", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
           ),
@@ -648,10 +703,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 }
 
-// 👇 Kept the same, but it now holds your new Exercise model
 class ExerciseWithCategory {
   final Exercise exercise;
   final String category;
-
   ExerciseWithCategory(this.exercise, this.category);
 }
