@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/education_service.dart';
+import 'quiz_result_screen.dart'; // Make sure this matches your file name!
+import 'quiz_history_screen.dart';
 
 class QuizScreen extends StatefulWidget {
   final Map<String, dynamic> quizData;
@@ -48,20 +50,26 @@ class _QuizScreenState extends State<QuizScreen> {
       _isSubmitting = true;
     });
 
-    final results = await _apiService.submitQuiz(_attemptId, _selectedAnswers);
+    Map<String, int> formattedApiAnswers = {};
+    _selectedAnswers.forEach((questionIndex, choiceIndex) {
+      String questionId = _questions[questionIndex]['id'];
+      formattedApiAnswers[questionId] = choiceIndex;
+    });
+
+    final results = await _apiService.submitQuiz(_attemptId, formattedApiAnswers);
 
     setState(() {
       _isSubmitting = false;
     });
 
     if (results != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Awesome! You scored ${results['score']} points!'),
-          backgroundColor: const Color(0xFF00C853),
+      // 🔹 OPEN THE RESULTS SCREEN AND CLOSE THE QUIZ!
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => QuizResultsScreen(resultData: results),
         ),
       );
-      Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error submitting quiz. Please try again.')),
@@ -169,8 +177,6 @@ class _QuizScreenState extends State<QuizScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
-                          // Use a fake border wrapper to fake a gradient border if we wanted,
-                          // but here a soft shadow and gradient fill looks cleaner.
                           border: Border.all(
                             color: isSelected ? const Color(0xFF2979FF).withOpacity(0.5) : Colors.grey.shade200,
                             width: 2,
@@ -208,7 +214,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                 child: Text(
                                   choices[index],
                                   style: const TextStyle(
-                                    color: Colors.white, // Required for ShaderMask to work
+                                    color: Colors.white,
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -252,8 +258,8 @@ class _QuizScreenState extends State<QuizScreen> {
                 child: ElevatedButton(
                   onPressed: hasAnsweredCurrent && !_isSubmitting ? _nextQuestion : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent, // Let the Container's gradient show through
-                    shadowColor: Colors.transparent, // Remove default shadow
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),

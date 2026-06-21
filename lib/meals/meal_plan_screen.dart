@@ -8,6 +8,7 @@ import '../../core/theme/app_gradients.dart';
 import 'meal_model.dart';
 import 'meal_service.dart';
 import '../../meals/meal_detail_screen.dart';
+import 'today_logs_screen.dart'; // 👈 Make sure to import your new screen here!
 
 class MealPlanScreen extends StatefulWidget {
   const MealPlanScreen({super.key});
@@ -18,9 +19,10 @@ class MealPlanScreen extends StatefulWidget {
 
 class _MealPlanScreenState extends State<MealPlanScreen> {
   final MealService _mealService = MealService();
-  bool isTodaySelected = true;
 
-  // State variables for backend data
+  // 🔄 Changed this to toggle between Plan and Logged!
+  bool isPlanSelected = true;
+
   MealPlanResponse? _mealPlanResponse;
   bool _isLoading = true;
   String? _error;
@@ -54,12 +56,8 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
         },
       );
 
-      print("🥗 MEAL STATUS: ${response.statusCode}");
-      print("📦 MEAL BODY: ${response.body}");
-
       if (response.statusCode == 200) {
         final dynamic decodedData = json.decode(response.body);
-
         setState(() {
           if (decodedData is List && decodedData.isNotEmpty) {
             _mealPlanResponse = MealPlanResponse.fromJson(decodedData[0]);
@@ -77,7 +75,6 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
         });
       }
     } catch (e) {
-      print("🚨 MEAL MODEL MAPPING ERROR: $e");
       setState(() {
         _error = "Failed to process meal data.";
         _isLoading = false;
@@ -87,34 +84,22 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 1. Show spinner if loading
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // 2. Show error text if something went wrong
     if (_error != null) {
       return Scaffold(
         body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Text(
-              "Error: $_error",
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.red, fontSize: 16),
-            ),
-          ),
+          child: Text("Error: $_error", style: const TextStyle(color: Colors.red, fontSize: 16)),
         ),
       );
     }
 
-    // 3. Draw the main UI
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text("Your Meal Plan", style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w600)),
+        title: const Text("Nutrition", style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w600)),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -123,32 +108,44 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Stack(
+      body: Column(
         children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 100),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildToggleSwitch(),
-                _buildNutritionSummary(),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  child: Text(
-                      isTodaySelected ? "Today's Meals" : "This Week's Meals",
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
-                  ),
-                ),
-                _buildMealsList(),
-              ],
-            ),
-          ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: _buildBottomActions(),
+          _buildToggleSwitch(),
+
+          // 🔀 Here is the magic! It swaps the entire screen based on the toggle!
+          Expanded(
+            child: isPlanSelected
+                ? _buildPlanView()
+                : const TodayLogsScreen(),
           ),
         ],
       ),
+    );
+  }
+
+  // 📦 Extracted your Plan layout into its own widget function
+  Widget _buildPlanView() {
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 100),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildNutritionSummary(),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Text("Today's Meals", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+              _buildMealsList(),
+            ],
+          ),
+        ),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: _buildBottomActions(),
+        ),
+      ],
     );
   }
 
@@ -167,27 +164,27 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
           children: [
             Expanded(
               child: GestureDetector(
-                onTap: () => setState(() => isTodaySelected = true),
+                onTap: () => setState(() => isPlanSelected = true),
                 child: Container(
                   decoration: BoxDecoration(
-                    gradient: isTodaySelected ? AppGradients.primary : null,
+                    gradient: isPlanSelected ? AppGradients.primary : null,
                     borderRadius: BorderRadius.circular(25),
                   ),
                   alignment: Alignment.center,
-                  child: Text("Today", style: TextStyle(color: isTodaySelected ? Colors.white : Colors.grey, fontWeight: FontWeight.bold)),
+                  child: Text("Plan", style: TextStyle(color: isPlanSelected ? Colors.white : Colors.grey, fontWeight: FontWeight.bold)),
                 ),
               ),
             ),
             Expanded(
               child: GestureDetector(
-                onTap: () => setState(() => isTodaySelected = false),
+                onTap: () => setState(() => isPlanSelected = false),
                 child: Container(
                   decoration: BoxDecoration(
-                    gradient: !isTodaySelected ? AppGradients.primary : null,
+                    gradient: !isPlanSelected ? AppGradients.primary : null,
                     borderRadius: BorderRadius.circular(25),
                   ),
                   alignment: Alignment.center,
-                  child: Text("This Week", style: TextStyle(color: !isTodaySelected ? Colors.white : Colors.grey, fontWeight: FontWeight.bold)),
+                  child: Text("Logged", style: TextStyle(color: !isPlanSelected ? Colors.white : Colors.grey, fontWeight: FontWeight.bold)),
                 ),
               ),
             ),
@@ -196,17 +193,11 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
       ),
     );
   }
+
   Widget _buildNutritionSummary() {
-    // 1. Safety Check: If data hasn't loaded yet, return an empty box
-    if (_mealPlanResponse == null || _mealPlanResponse!.days.isEmpty) {
-      return const SizedBox();
-    }
+    if (_mealPlanResponse == null || _mealPlanResponse!.days.isEmpty) return const SizedBox();
 
-    // 2. Figure out which day we are looking at (Matches your toggle switch logic!)
-    int dayIndex = isTodaySelected ? 0 : (_mealPlanResponse!.days.length > 1 ? 1 : 0);
-    final currentMeals = _mealPlanResponse!.days[dayIndex].meals;
-
-    // 3. 🧮 Calculate dynamic totals by looping through the meals!
+    final currentMeals = _mealPlanResponse!.days[0].meals; // Always fetching index 0 for today now
     int dailyCalories = 0;
     double dailyProtein = 0;
     double dailyCarbs = 0;
@@ -219,9 +210,6 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
       dailyFats += meal.fat;
     }
 
-    // 4. 🎯 User Goals (Targets)
-    // NOTE: Right now, I set these to standard targets.
-    // Later, you can replace these with the actual user's goals from their profile!
     int targetCalories = 2000;
     int targetProtein = 150;
     int targetCarbs = 200;
@@ -238,56 +226,21 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-              isTodaySelected ? "Today's Nutrition Plan" : "This Week's Nutrition Plan",
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
-          ),
+          const Text("Today's Nutrition Plan", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(
-                child: _buildNutrientItem(
-                    "Calories",
-                    "$dailyCalories", // 👈 Now completely dynamic!
-                    "$targetCalories kcal",
-                    const Color(0xFFFF9800),
-                    Icons.local_fire_department
-                ),
-              ),
+              Expanded(child: _buildNutrientItem("Calories", "$dailyCalories", "$targetCalories kcal", const Color(0xFFFF9800), Icons.local_fire_department)),
               const SizedBox(width: 15),
-              Expanded(
-                child: _buildNutrientItem(
-                    "Protein",
-                    "${dailyProtein.toInt()}", // 👈 Now completely dynamic!
-                    "$targetProtein g",
-                    const Color(0xFF4CAF50),
-                    Icons.egg_alt
-                ),
-              ),
+              Expanded(child: _buildNutrientItem("Protein", "${dailyProtein.toInt()}", "$targetProtein g", const Color(0xFF4CAF50), Icons.egg_alt)),
             ],
           ),
           const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(
-                child: _buildNutrientItem(
-                    "Carbs",
-                    "${dailyCarbs.toInt()}", // 👈 Now completely dynamic!
-                    "$targetCarbs g",
-                    Colors.teal,
-                    Icons.bakery_dining
-                ),
-              ),
+              Expanded(child: _buildNutrientItem("Carbs", "${dailyCarbs.toInt()}", "$targetCarbs g", Colors.teal, Icons.bakery_dining)),
               const SizedBox(width: 15),
-              Expanded(
-                child: _buildNutrientItem(
-                    "Fats",
-                    "${dailyFats.toInt()}", // 👈 Now completely dynamic!
-                    "$targetFats g",
-                    Colors.cyan,
-                    Icons.opacity
-                ),
-              ),
+              Expanded(child: _buildNutrientItem("Fats", "${dailyFats.toInt()}", "$targetFats g", Colors.cyan, Icons.opacity)),
             ],
           ),
         ],
@@ -320,50 +273,18 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
           ],
         ),
         const SizedBox(height: 8),
-        LinearProgressIndicator(
-          value: progress,
-          backgroundColor: color.withOpacity(0.15),
-          valueColor: AlwaysStoppedAnimation<Color>(color),
-          borderRadius: BorderRadius.circular(10),
-          minHeight: 6,
-        ),
+        LinearProgressIndicator(value: progress, backgroundColor: color.withOpacity(0.15), valueColor: AlwaysStoppedAnimation<Color>(color), borderRadius: BorderRadius.circular(10), minHeight: 6),
       ],
     );
   }
 
   Widget _buildMealsList() {
-    // Check if we actually have data from the backend
     if (_mealPlanResponse == null || _mealPlanResponse!.days.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(40.0),
-          child: Text("No meals planned yet!", style: TextStyle(color: Colors.grey)),
-        ),
-      );
+      return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text("No meals planned yet!", style: TextStyle(color: Colors.grey))));
     }
 
-// Map Sunday to 0, Monday to 1, Tuesday to 2, etc.
-    int currentDayOfWeek = DateTime.now().weekday % 7;
-
-// Safety check: ensure the days list is long enough to avoid crashes
-    int dayIndex = 0;
-    if (_mealPlanResponse!.days.length > currentDayOfWeek) {
-      dayIndex = currentDayOfWeek;
-    }
-
-    final currentMeals = _mealPlanResponse!.days[dayIndex].meals;
-
-    if (currentMeals.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(40.0),
-          child: Text(
-            "No meals found for this day.",
-            style: TextStyle(color: Colors.grey),
-          ),
-        ),
-      );
-    }
+    final currentMeals = _mealPlanResponse!.days[0].meals;
+    if (currentMeals.isEmpty) return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text("No meals found for this day.", style: TextStyle(color: Colors.grey))));
 
     return ListView.builder(
       shrinkWrap: true,
@@ -386,39 +307,10 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
         children: [
           Stack(
             children: [
-              Container(
-                height: 160,
-                decoration: const BoxDecoration(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                  // NOTE: If you have an image URL in your model, use this:
-                  // image: DecorationImage(image: NetworkImage(meal.imageUrl), fit: BoxFit.cover),
-                  color: Colors.grey, // Placeholder if no image exists yet
-                ),
-              ),
-              Container(
-                height: 160,
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: 15, left: 15,
-                child: Text(meal.name, // Updated from meal.title to meal.name
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-              ),
-              Positioned(
-                top: 15, left: 15,
-                child: CircleAvatar(
-                  backgroundColor: Colors.white,
-                  radius: 16,
-                  child: Icon(_getIconForCategory(meal.mealType), size: 10, color: const Color(0xFF4CAF50)),
-                ),
-              ),
+              Container(height: 160, decoration: const BoxDecoration(borderRadius: BorderRadius.vertical(top: Radius.circular(24)), color: Colors.grey)),
+              Container(height: 160, decoration: BoxDecoration(borderRadius: const BorderRadius.vertical(top: Radius.circular(24)), gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black.withOpacity(0.7)]))),
+              Positioned(bottom: 15, left: 15, child: Text(meal.name, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
+              Positioned(top: 15, left: 15, child: CircleAvatar(backgroundColor: Colors.white, radius: 16, child: Icon(_getIconForCategory(meal.mealType), size: 10, color: const Color(0xFF4CAF50)))),
             ],
           ),
           Padding(
@@ -428,7 +320,6 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    //Text(meal.mealType, style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.w500)),
                     Row(
                       children: [
                         const Icon(Icons.local_fire_department, color: Color(0xFFFF9800), size: 16),
@@ -438,13 +329,10 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                   ],
                 ),
                 const SizedBox(height: 15),
-// 👇 The updated, uncommented ingredients Wrap!
                 SizedBox(
                   width: double.infinity,
                   child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    // We changed 'item.name' to just 'ingredient' since it's a String now!
+                    spacing: 8, runSpacing: 8,
                     children: meal.ingredients.take(4).map((ingredient) => Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(15)),
@@ -453,22 +341,12 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                   ),
                 ),
                 const SizedBox(height: 15),
-
                 Container(
-                  width: double.infinity,
-                  height: 45,
-                  decoration: BoxDecoration(
-                    gradient: AppGradients.primary,
-                    borderRadius: BorderRadius.circular(15),
-                  ),
+                  width: double.infinity, height: 45,
+                  decoration: BoxDecoration(gradient: AppGradients.primary, borderRadius: BorderRadius.circular(15)),
                   child: TextButton(
                     onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => MealDetailScreen(meal: meal),
-                        ),
-                      );
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => MealDetailScreen(meal: meal)));
                     },
                     child: const Text("View Details >", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
@@ -492,25 +370,15 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
   Widget _buildBottomActions() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))],
-      ),
+      decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))]),
       child: SafeArea(
         child: Row(
           children: [
             Expanded(
               flex: 3,
               child: Container(
-                height: 50,
-                decoration: BoxDecoration(
-                  gradient: AppGradients.primary,
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: TextButton(
-                  onPressed: () {},
-                  child: const Text("+ Log a Meal", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                ),
+                height: 50, decoration: BoxDecoration(gradient: AppGradients.primary, borderRadius: BorderRadius.circular(15)),
+                child: TextButton(onPressed: () {}, child: const Text("+ Log a Meal", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))),
               ),
             ),
             const SizedBox(width: 15),
@@ -520,11 +388,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                 onPressed: () {},
                 icon: const Icon(Icons.camera_alt_outlined, color: Colors.black87),
                 label: const Text("Scan", style: TextStyle(color: Colors.black87)),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(0, 50),
-                  side: BorderSide(color: Colors.grey.shade300),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                ),
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 50), side: BorderSide(color: Colors.grey.shade300), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
               ),
             ),
           ],

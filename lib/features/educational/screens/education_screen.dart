@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import '../services/education_service.dart';
 import 'quiz_screen.dart';
-class EducationScreen extends StatefulWidget {
-  final String userId;
+import 'quiz_history_screen.dart';
 
-  const EducationScreen({super.key, required this.userId});
+class EducationScreen extends StatefulWidget {
+  // 🔹 No more userId required here!
+  const EducationScreen({super.key});
 
   @override
   State<EducationScreen> createState() => _EducationScreenState();
@@ -36,7 +37,8 @@ class _EducationScreenState extends State<EducationScreen> {
       builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
-    final quizData = await _apiService.startQuiz(widget.userId, difficulty);
+    // 🔹 Only passing the difficulty now!
+    final quizData = await _apiService.startQuiz(difficulty);
 
     if (mounted) Navigator.pop(context); // Remove loading indicator
 
@@ -51,11 +53,11 @@ class _EducationScreenState extends State<EducationScreen> {
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
-    // Using a light background to match the uploaded design
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA), // Very light grey/white background
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -69,6 +71,16 @@ class _EducationScreenState extends State<EducationScreen> {
         ),
         centerTitle: false,
         actions: [
+          // 🔹 NEW: History Button
+          IconButton(
+            icon: const Icon(Icons.history, color: Colors.black87),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const QuizHistoryScreen()),
+              );
+            },
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
             child: CircleAvatar(
@@ -90,7 +102,7 @@ class _EducationScreenState extends State<EducationScreen> {
               ),
               const SizedBox(height: 24),
 
-              /// 🔹 Daily Fact Card (Matches the top gradient card in your image)
+              /// 🔹 Daily Fact Card
               _buildDailyFactCard(),
 
               const SizedBox(height: 32),
@@ -119,29 +131,29 @@ class _EducationScreenState extends State<EducationScreen> {
                     title: "Easy",
                     subtitle: "10 questions",
                     icon: Icons.sentiment_satisfied_alt,
-                    iconColor: const Color(0xFF00E676), // Green
+                    iconColor: const Color(0xFF00E676),
                     difficulty: "EASY",
                   ),
                   _buildDifficultyCard(
                     title: "Medium",
                     subtitle: "15 questions",
                     icon: Icons.fitness_center,
-                    iconColor: const Color(0xFF2979FF), // Blue
+                    iconColor: const Color(0xFF2979FF),
                     difficulty: "MEDIUM",
                   ),
                   _buildDifficultyCard(
                     title: "Hard",
                     subtitle: "20 questions",
                     icon: Icons.local_fire_department,
-                    iconColor: const Color(0xFFFF3D00), // Orange
+                    iconColor: const Color(0xFFFF3D00),
                     difficulty: "HARD",
                   ),
                   _buildDifficultyCard(
                     title: "Random",
                     subtitle: "Mixed level",
                     icon: Icons.shuffle,
-                    iconColor: const Color(0xFFE040FB), // Purple
-                    difficulty: "MEDIUM", // Defaults to medium for random
+                    iconColor: const Color(0xFFE040FB),
+                    difficulty: "MEDIUM",
                   ),
                 ],
               ),
@@ -160,7 +172,7 @@ class _EducationScreenState extends State<EducationScreen> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF00C853), Color(0xFF2979FF)], // Green to Blue gradient
+          colors: [Color(0xFF00C853), Color(0xFF2979FF)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

@@ -1,3 +1,4 @@
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_gradients.dart';
@@ -113,19 +114,28 @@ class HomeScreen extends StatelessWidget {
               ),
 
               /// 🔹 Posture Feature
+              /// 🔹 Posture Feature
               FeatureCard(
-                title: "Check Workout Posture",
+                title: "Bench Press Tracker",
                 subtitle: "AI-powered form analysis",
-                buttonText: "Check Posture",
+                buttonText: "Start Tracking",
                 buttonGradient: AppGradients.posture,
-                onPressed: () {
-                  // --- ADDED NAVIGATION HERE ---
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const SelectExerciseScreen(),
-                    ),
-                  );
+                onPressed: () async {
+                  // 1. Grab the phone's cameras instantly
+                  final cameras = await availableCameras();
+
+                  if (context.mounted) {
+                    // 2. Push directly to the camera screen and lock in Bench Press!
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PoseDetectorScreen(
+                          cameras: cameras,
+                          exerciseTitle: "Bench Press", // 👈 Hardcoded forever!
+                        ),
+                      ),
+                    );
+                  }
                 },
               ),
 
@@ -160,7 +170,7 @@ class HomeScreen extends StatelessWidget {
             context,
             MaterialPageRoute(
               // Replace "dummy_id" with your actual user ID logic later!
-              builder: (context) => const EducationScreen(userId: "dummy_id"),
+              builder: (context) => const EducationScreen(),
             ),
           );
         } else if (index == 2) {

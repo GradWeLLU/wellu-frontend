@@ -30,7 +30,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
+  camera: ^0.10.5+5
+  image: ^4.1.3  # For fast YUV to JPEG conversion!
   http: ^1.1.0
 
   # The following adds the Cupertino Icons font to your application.

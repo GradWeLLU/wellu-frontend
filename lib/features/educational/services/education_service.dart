@@ -1,117 +1,97 @@
 import 'dart:convert';
-import 'dart:math';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class EducationService {
+  // 🔹 Use 10.0.2.2 if testing on an Android emulator!
+  final String baseUrl = 'http://10.0.2.2:8083';
 
-  /// 🔹 Get Today's Daily Fact (MOCK)
+  /// 🔹 Helper method to safely grab your JWT
+  Future<String?> _getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('auth_token');
+  }
+
+  /// 🔹 Helper to generate standard headers
+  Future<Map<String, String>> _getHeaders() async {
+    final token = await _getToken();
+    return {
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  /// 🔹 GET: Today's Daily Fact
   Future<Map<String, dynamic>?> getDailyFact() async {
-    // Simulate a network delay of 1.5 seconds
-    await Future.delayed(const Duration(milliseconds: 1500));
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/v1/daily-facts/today'),
+        headers: await _getHeaders(),
+      );
 
-    return {
-      "id": "fact-123",
-      "content": "Drinking 500ml of water can temporarily boost your metabolism by 24-30% for up to an hour!",
-      "category": "Nutrition",
-      "factDate": "2026-05-18",
-      "createdAt": "2026-05-18T08:00:00"
-    };
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (e) {
+      print('Error fetching daily fact: $e');
+    }
+    return null;
   }
 
-  /// 🔹 Start a New Quiz (MOCK)
-  Future<Map<String, dynamic>?> startQuiz(String userId, String difficulty) async {
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 1500));
+  /// 🔹 POST: Start a New Quiz
+  Future<Map<String, dynamic>?> startQuiz(String difficulty) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/quiz-attempts/start'),
+        headers: await _getHeaders(),
+        body: jsonEncode({
+          'difficulty': difficulty, // 👈 No more userId needed!
+        }),
+      );
 
-    return {
-      "attemptId": "attempt-999",
-      "userId": userId,
-      "score": 0.0,
-      "completedAt": null,
-      "quiz": {
-        "id": "quiz-001",
-        "title": "$difficulty Wellness Challenge",
-        "difficulty": difficulty,
-        "timeLimit": 300,
-        "isDaily": true,
-        "totalPoints": 20,
-        "questions": [
-          {
-            "id": "q-1",
-            "content": "Which macronutrient is primarily responsible for muscle repair and growth?",
-            "choices": ["Carbohydrates", "Proteins", "Fats", "Vitamins"],
-            "difficulty": difficulty,
-            "points": 10
-          },
-          {
-            "id": "q-2",
-            "content": "How many hours of sleep is generally recommended for optimal muscle recovery?",
-            "choices": ["4-5 hours", "6-7 hours", "7-9 hours", "10+ hours"],
-            "difficulty": difficulty,
-            "points": 10
-          }
-        ]
-      },
-      "answers": {} // Empty at start
-    };
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      }
+    } catch (e) {
+      print('Error starting quiz: $e');
+    }
+    return null;
   }
 
-  /// 🔹 Submit Quiz Answers (MOCK)
-  Future<Map<String, dynamic>?> submitQuiz(String attemptId, Map<int, int> answers) async {
-    // Simulate network processing delay
-    await Future.delayed(const Duration(seconds: 2));
+  /// 🔹 POST: Submit Quiz Answers
+  Future<Map<String, dynamic>?> submitQuiz(String attemptId, Map<String, int> answers) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/quiz-attempts/$attemptId/submit'),
+        headers: await _getHeaders(),
+        body: jsonEncode({
+          'answers': answers,
+        }),
+      );
 
-    // Hardcoding a perfect score response for demo purposes!
-    return {
-      "attemptId": attemptId,
-      "userId": "uuid-123",
-      "score": 20.0,
-      "completedAt": "2026-05-18T18:20:00",
-      "quiz": {
-        "id": "quiz-001",
-        "title": "Wellness Challenge",
-        "difficulty": "EASY",
-        "timeLimit": 300,
-        "isDaily": true,
-        "totalPoints": 20,
-        "questions": [
-          {
-            "id": "q-1",
-            "content": "Which macronutrient is primarily responsible for muscle repair and growth?",
-            "choices": ["Carbohydrates", "Proteins", "Fats", "Vitamins"],
-            "difficulty": "EASY",
-            "points": 10
-          },
-          {
-            "id": "q-2",
-            "content": "How many hours of sleep is generally recommended for optimal muscle recovery?",
-            "choices": ["4-5 hours", "6-7 hours", "7-9 hours", "10+ hours"],
-            "difficulty": "EASY",
-            "points": 10
-          }
-        ]
-      },
-      "questionResults": [
-        {
-          "questionId": "q-1",
-          "content": "Which macronutrient is primarily responsible for muscle repair and growth?",
-          "choices": ["Carbohydrates", "Proteins", "Fats", "Vitamins"],
-          "selectedAnswerIndex": answers[0] ?? 1,
-          "correctAnswerIndex": 1,
-          "correct": answers[0] == 1,
-          "explanation": "Proteins are made of amino acids, which are the building blocks of muscle.",
-          "points": answers[0] == 1 ? 10 : 0
-        },
-        {
-          "questionId": "q-2",
-          "content": "How many hours of sleep is generally recommended for optimal muscle recovery?",
-          "choices": ["4-5 hours", "6-7 hours", "7-9 hours", "10+ hours"],
-          "selectedAnswerIndex": answers[1] ?? 2,
-          "correctAnswerIndex": 2,
-          "correct": answers[1] == 2,
-          "explanation": "7-9 hours of sleep allows the body to release growth hormones necessary for recovery.",
-          "points": answers[1] == 2 ? 10 : 0
-        }
-      ]
-    };
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      }
+    } catch (e) {
+      print('Error submitting quiz: $e');
+    }
+    return null;
+  }
+
+  /// 🔹 GET: Fetch User's Past Attempts
+  Future<List<dynamic>?> getMyAttempts() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/quiz-attempts/my-attempts'),
+        headers: await _getHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body); // Returns the array of attempts
+      }
+    } catch (e) {
+      print('Error fetching past attempts: $e');
+    }
+    return null;
   }
 }
